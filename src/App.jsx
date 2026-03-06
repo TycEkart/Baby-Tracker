@@ -5,10 +5,11 @@ import { getAnalytics } from "firebase/analytics";
 
 import {
     getFirestore, collection, addDoc, onSnapshot, doc, getDoc,
-    setDoc, deleteDoc, updateDoc, Timestamp
+    setDoc, deleteDoc, updateDoc, Timestamp, getDocs, writeBatch
 } from 'firebase/firestore';
 import {
-    getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged
+    getAuth, onAuthStateChanged,
+    GoogleAuthProvider, signInWithPopup, signOut
 } from 'firebase/auth';
 import {
     Baby, History, BarChart3, Trash2, Clock, Milk, Info, X, Droplets, Calendar,
@@ -16,23 +17,20 @@ import {
     Tag, Zap, Filter, Utensils, Settings, ShieldCheck, Heart, RefreshCw,
     ArrowLeft, ArrowRight, Moon, Sun, ChevronLeft, ChevronRight, FlaskConical,
     CheckCircle2, FileCode2, ChevronDown, ChevronUp, Eraser, Sparkles, AlertCircle,
-    Eye, EyeOff, Bug
+    Eye, EyeOff, Bug, LogOut, Copy
 } from 'lucide-react';
 
 // --- CONFIGURATIE ---
-const APP_VERSION = '1.77.0';
+const APP_VERSION = '1.80.0';
 
 const VERSION_HISTORY = [
-    { version: '1.77.0', notes: ['Groter contrast tussen de dagen in de daggrafiek', 'Nieuw overzicht met versiegeschiedenis in instellingen'] },
-    { version: '1.76.0', notes: ['Stabiele lay-out volledig hersteld', 'Invoervelden, plus-knoppen en icoontjes strak uitgelijnd'] }
+    { version: '1.80.0', notes: ['Added unauthorized user screen for easier setup.'] },
+    { version: '1.79.1', notes: ['Fixed bug in data migration tool.'] },
+    { version: '1.79.0', notes: ['Added one-time data migration tool.'] },
+    { version: '1.78.0', notes: ['Implemented user-specific data and security rules.', 'Added Google Sign-In and a sign-out button.'] },
 ];
 
-
-
-
 // Your web app's Firebase configuration
-// IMPORTANT: 1. Create a new Firebase project. 2. Enable "Anonymous" Authentication. 3. Replace these values.
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
     apiKey: "AIzaSyBYWuxQuuQJAxm7W0nN85H1yGVewZwzi10",
     authDomain: "baby-tracker-2ee79.firebaseapp.com",
@@ -50,13 +48,9 @@ const analytics = getAnalytics(app);
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 
-// Dynamische appId met persoonlijke fallback targetId
-const appId = typeof __app_id !== 'undefined' ? __app_id : '1xGoR2vsd3kdZukzvzF9Y8RXxumMv_W7yX4TtMF2Zc4Y';
-
 // --- HELPERS ---
 const isEveningTime = () => {
     const hour = new Date().getHours();
-    // Donker tussen 19:00 en 08:00
     return hour >= 19 || hour < 8;
 };
 
@@ -145,9 +139,73 @@ class ErrorBoundary extends Component {
     }
 }
 
+function LoginScreen({ onLogin, isDarkMode }) {
+    const handleGoogleSignIn = async () => {
+        if (!auth) return;
+        const provider = new GoogleAuthProvider();
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            console.error("Google Sign-In Error:", error);
+        }
+    };
+
+    return (
+        <div className={`min-h-screen flex items-center justify-center p-6 text-center font-sans ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+            <div className={`p-8 rounded-[2rem] shadow-2xl max-w-sm w-full space-y-6 border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                <div className="flex flex-col items-center gap-2">
+                    <Baby size={48} className="text-indigo-500" />
+                    <h1 className="text-2xl font-black tracking-tight">Baby Tracker</h1>
+                    <p className="text-sm opacity-60">Log and track your baby's activities.</p>
+                </div>
+                <button
+                    onClick={handleGoogleSignIn}
+                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase flex items-center justify-center gap-3 shadow-lg shadow-indigo-500/20"
+                >
+                    <svg className="w-5 h-5" viewBox="0 0 48 48">
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C41.38,36.218,44,30.668,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                    </svg>
+                    Sign In with Google
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function UnauthorizedScreen({ user, isDarkMode }) {
+    const showToast = (msg) => {
+        const toastEl = document.createElement('div');
+        toastEl.className = "fixed top-20 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-full duration-500";
+        toastEl.innerHTML = `<div class="px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border ${isDarkMode ? 'bg-indigo-900 border-indigo-500' : 'bg-indigo-600 border-indigo-500'} text-white"><span class="font-black text-[11px] uppercase tracking-widest">${msg}</span></div>`;
+        document.body.appendChild(toastEl);
+        setTimeout(() => document.body.removeChild(toastEl), 3500);
+    };
+
+    return (
+        <div className={`min-h-screen flex items-center justify-center p-6 text-center font-sans ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+            <div className={`p-8 rounded-[2rem] shadow-2xl max-w-sm w-full space-y-4 border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                <AlertTriangle className="text-orange-500 mx-auto" size={48} />
+                <h1 className="text-lg font-black uppercase tracking-tight">Access Denied</h1>
+                <p className="text-xs opacity-60">You are not authorized to use this application. Please contact the administrator and provide them with your User ID to request access.</p>
+                <div className="text-xs p-3 rounded-lg bg-slate-100 dark:bg-slate-800 break-all flex items-center justify-between">
+                    <code>{user.uid}</code>
+                    <button onClick={() => navigator.clipboard.writeText(user.uid).then(() => showToast('UID Copied!'))} className="p-2 active:scale-90 transition-transform"><Copy size={14} /></button>
+                </div>
+                <button onClick={() => signOut(auth)} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-red-500/20">
+                    <LogOut size={16} /> Sign Out
+                </button>
+            </div>
+        </div>
+    );
+}
+
 function AppInternal() {
     // --- STATE ---
     const [user, setUser] = useState(null);
+    const [isAuthorized, setIsAuthorized] = useState(false);
     const [activeTab, setActiveTab] = useState('log');
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -235,10 +293,10 @@ function AppInternal() {
 
             let finalId = editingId;
             if (editingId) {
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'baby_logs', editingId), payload);
+                await updateDoc(doc(db, 'users', user.uid, 'baby_logs', editingId), payload);
             } else {
                 payload.createdAt = Timestamp.now();
-                const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'baby_logs'), payload);
+                const docRef = await addDoc(collection(db, 'users', user.uid, 'baby_logs'), payload);
                 finalId = docRef.id;
             }
 
@@ -290,9 +348,9 @@ function AppInternal() {
     };
 
     const confirmDelete = async () => {
-        if (!itemToDelete || !db) return;
+        if (!itemToDelete || !db || !user) return;
         try {
-            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'baby_logs', itemToDelete));
+            await deleteDoc(doc(db, 'users', user.uid, 'baby_logs', itemToDelete));
             setItemToDelete(null);
             showToast("Verwijderd");
         } catch (err) {
@@ -310,7 +368,7 @@ function AppInternal() {
         const newVal = !isDarkMode;
         setIsDarkMode(newVal);
         if (user && db) {
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'appearance'), { isDarkMode: newVal }, { merge: true });
+            await setDoc(doc(db, 'users', user.uid, 'settings', 'appearance'), { isDarkMode: newVal }, { merge: true });
         }
     };
 
@@ -318,7 +376,7 @@ function AppInternal() {
         const newVis = { ...visibilitySettings, [key]: !visibilitySettings[key] };
         setVisibilitySettings(newVis);
         if (user && db) {
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility'), newVis, { merge: true });
+            await setDoc(doc(db, 'users', user.uid, 'settings', 'visibility'), newVis, { merge: true });
         }
     };
 
@@ -326,7 +384,7 @@ function AppInternal() {
         const newReqs = { ...vitRequirements, [key]: !vitRequirements[key] };
         setVitRequirements(newReqs);
         if (user && db) {
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'vitamin_requirements'), newReqs, { merge: true });
+            await setDoc(doc(db, 'users', user.uid, 'settings', 'vitamin_requirements'), newReqs, { merge: true });
         }
     };
 
@@ -335,13 +393,13 @@ function AppInternal() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'baby-tracker-backup.json';
+        link.download = `baby-tracker-backup-${user.uid}.json`;
         link.click();
     };
 
     const handleImport = (e) => {
         const file = e.target.files[0];
-        if (!file || !db) return;
+        if (!file || !db || !user) return;
         const reader = new FileReader();
         reader.onload = async (ev) => {
             try {
@@ -351,7 +409,7 @@ function AppInternal() {
                 for (const item of data) {
                     if (item.timestamp) {
                         const { id, ...rest } = item;
-                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'baby_logs'), { ...rest, createdAt: Timestamp.now() });
+                        await addDoc(collection(db, 'users', user.uid, 'baby_logs'), { ...rest, createdAt: Timestamp.now() });
                     }
                 }
                 showToast("Import geslaagd");
@@ -364,101 +422,100 @@ function AppInternal() {
         reader.readAsText(file);
     };
 
-    const handleInsertTestData = async () => {
-        if (!user || !db || isSubmitting) return;
+    const handleSignOut = async () => {
+        if (auth) {
+            await signOut(auth);
+        }
+    };
+
+    const handleMigrateData = async () => {
+        if (!user || !db) return;
+
         setIsSubmitting(true);
+        setDbError(null);
+        showToast("Starting migration...", "info");
+
+        const oldAppId = '1xGoR2vsd3kdZukzvzF9Y8RXxumMv_W7yX4TtMF2Zc4Y';
+        const oldLogsRef = collection(db, 'artifacts', oldAppId, 'public', 'data', 'baby_logs');
+        const newLogsRef = collection(db, 'users', user.uid, 'baby_logs');
+
         try {
-            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'baby_logs');
-            const baseDate = new Date();
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date(baseDate); d.setDate(d.getDate() - i); d.setHours(7, 0, 0, 0);
-                let time = d.getTime();
-                for (let j = 0; j < 5; j++) {
-                    const rand = Math.random();
-                    const log = { timestamp: new Date(time).toISOString(), createdAt: Timestamp.now(), hasPlas: Math.random() > 0.3, hasPoep: Math.random() > 0.8, isTestData: true };
-                    if (rand > 0.6) { log.feedType = 'Fles'; log.amount = 120; }
-                    else if (rand > 0.2) { log.feedType = 'Borst'; log.amountLeft = 10; log.amountRight = 10; log.amount = 20; log.firstBreast = 'Links'; }
-                    else { log.feedType = 'Vast'; log.amount = 60; }
-                    await addDoc(colRef, log);
-                    time += (4 * 60 * 60 * 1000);
-                }
+            const oldLogsSnapshot = await getDocs(oldLogsRef);
+            if (oldLogsSnapshot.empty) {
+                showToast("No old data found to migrate.", "info");
+                setIsSubmitting(false);
+                return;
             }
-            showToast("Testdata klaar!");
-        } catch (e) {} finally { setIsSubmitting(false); }
-    };
 
-    const handleDeleteAllTestData = async () => {
-        setIsSubmitting(true);
-        const testLogs = logs.filter(l => l.isTestData);
-        for (const t of testLogs) {
-            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'baby_logs', t.id));
-        }
-        showToast("Testdata verwijderd");
-        setIsSubmitting(false);
-    };
+            const batch = writeBatch(db);
 
-    const handleTimelineScroll = (e) => {
-        if (isAutoScrollingRef.current) return;
-        const index = Math.round(e.target.scrollLeft / 960);
-        const day = trendsChartData[index];
-        if (day && day.id !== selectedDayId) setSelectedDayId(day.id);
-    };
+            oldLogsSnapshot.forEach(logDoc => {
+                const oldData = logDoc.data();
+                const newDocRef = doc(newLogsRef);
+                batch.set(newDocRef, oldData);
+                batch.delete(logDoc.ref);
+            });
 
-    const handleSelectDay = (id) => {
-        setSelectedDayId(id);
-        const index = trendsChartData.findIndex(d => d.id === id);
-        if (index !== -1 && timelineScrollRef.current) {
-            isAutoScrollingRef.current = true;
-            timelineScrollRef.current.scrollTo({ left: index * 960, behavior: 'smooth' });
-            setTimeout(() => isAutoScrollingRef.current = false, 600);
+            await batch.commit();
+
+            showToast("Migration successful!", "success");
+
+        } catch (err) {
+            console.error("Migration failed:", err);
+            setDbError(`Migration Error: ${err.message}. Check Firestore rules.`);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleNavigateDay = (dir) => {
-        const curIdx = trendsChartData.findIndex(d => d.id === selectedDayId);
-        const nextIdx = curIdx + dir;
-        if (nextIdx >= 0 && nextIdx < trendsChartData.length) handleSelectDay(trendsChartData[nextIdx].id);
-    };
-
-    // --- FIREBASE INIT ---
+    // --- FIREBASE INIT & AUTH ---
     useEffect(() => {
         if (!auth || !db) return;
-        const initApp = async () => {
-            try {
-                let u;
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    u = (await signInWithCustomToken(auth, __initial_auth_token)).user;
-                } else {
-                    u = (await signInAnonymously(auth)).user;
+
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true);
+            if (currentUser) {
+                setUser(currentUser);
+                const authorizedDocRef = doc(db, 'authorized_users', currentUser.uid);
+                try {
+                    const authorizedDocSnap = await getDoc(authorizedDocRef);
+                    if (authorizedDocSnap.exists()) {
+                        setIsAuthorized(true);
+                        const loadSet = async (path, setter) => {
+                            const snap = await getDoc(doc(db, 'users', currentUser.uid, 'settings', path));
+                            if (snap.exists()) setter(snap.data());
+                        };
+                        await Promise.all([
+                            loadSet('appearance', (d) => setIsDarkMode(!!d.isDarkMode)),
+                            loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
+                            loadSet('vitamin_requirements', (d) => setVitRequirements(d))
+                        ]);
+                    } else {
+                        setIsAuthorized(false);
+                    }
+                } catch (err) {
+                    setDbError(`Auth Check Error: ${err.message}`);
+                    setIsAuthorized(false);
                 }
-                setUser(u);
-                const loadSet = async (path, setter) => {
-                    const snap = await getDoc(doc(db, 'artifacts', appId, 'users', u.uid, 'settings', path));
-                    if (snap.exists()) setter(snap.data());
-                };
-                await Promise.all([
-                    loadSet('appearance', (d) => setIsDarkMode(!!d.isDarkMode)),
-                    loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
-                    loadSet('vitamin_requirements', (d) => setVitRequirements(d))
-                ]);
-            } catch (err) {
-                console.error("Firebase Init Error:", err);
-                if (err.code === 'auth/configuration-not-found' || err.code === 'auth/operation-not-allowed') {
-                    setDbError("Setup Required: Enable 'Anonymous' authentication in Firebase Console.");
-                } else {
-                    setDbError(`Auth Error: ${err.message}`);
-                }
-            } finally {
-                setLoading(false);
+            } else {
+                setUser(null);
+                setIsAuthorized(false);
+                setLogs([]);
             }
-        };
-        initApp();
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
+
 
     // --- DATA SYNC ---
     useEffect(() => {
-        if (!user || !db) return;
-        const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'baby_logs');
+        if (!user || !db || !isAuthorized) {
+            setLogs([]);
+            return;
+        };
+        const colRef = collection(db, 'users', user.uid, 'baby_logs');
         const unsub = onSnapshot(colRef, (snap) => {
             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
                 .filter(l => l && l.timestamp)
@@ -470,7 +527,7 @@ function AppInternal() {
             setDbStatus('offline');
         });
         return () => unsub();
-    }, [user]);
+    }, [user, isAuthorized]);
 
     useEffect(() => {
         const timer = setInterval(() => setNow(new Date()), 60000);
@@ -562,7 +619,6 @@ function AppInternal() {
 
     const weeklyAvgs = useMemo(() => {
         const todayStr = toLocalDateString(new Date());
-        // Filter dagen met data EN sluit vandaag uit
         const hist = trendsChartData.filter(d => d.items.length > 0 && d.id !== todayStr);
         const count = hist.length || 1;
         return {
@@ -577,7 +633,6 @@ function AppInternal() {
         };
     }, [trendsChartData]);
 
-    // NIEUW: Specifieke dagstatistieken berekenen voor de actieve grafiek
     const selectedDayStats = useMemo(() => {
         const dayData = trendsChartData.find(d => d.id === selectedDayId);
         if (!dayData) return null;
@@ -661,6 +716,14 @@ function AppInternal() {
                 <Baby size={64} />
             </div>
         );
+    }
+
+    if (!user) {
+        return <LoginScreen isDarkMode={isDarkMode} />;
+    }
+
+    if (!isAuthorized) {
+        return <UnauthorizedScreen user={user} isDarkMode={isDarkMode} />;
     }
 
     return (
@@ -972,7 +1035,6 @@ function AppInternal() {
                                     </div>
                                 </div>
 
-                                {/* NIEUW: Dagelijkse totalen boven de grafiek */}
                                 {selectedDayStats && (
                                     <div className="flex gap-2 mb-4 overflow-x-auto custom-scrollbar pb-2">
                                         <div className={`shrink-0 p-3 rounded-2xl flex flex-col justify-center min-w-[5rem] ${isDarkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-50 text-slate-700'}`}>
@@ -1001,7 +1063,6 @@ function AppInternal() {
                                     </div>
                                 )}
 
-                                {/* HOOGTE FIX: h-[220px] naar de scroll container verplaatst zodat stats niet afkappen */}
                                 <div className="overflow-x-auto overflow-y-hidden custom-scrollbar h-[220px]" ref={timelineScrollRef} onScroll={handleTimelineScroll} style={{ touchAction: 'pan-x' }}>
                                     <div className="flex relative h-full" style={{ width: `${trendsChartData.length * 960}px` }}>
                                         {trendsChartData.map((day, idx) => {
@@ -1011,7 +1072,6 @@ function AppInternal() {
 
                                             return (
                                                 <div key={day.id} className={`relative w-[960px] h-full transition-colors ${bgClass}`}>
-                                                    {/* DATUM UITLIJNING FIX: Sticky en top-0 */}
                                                     <div className={`sticky top-0 left-0 inline-block px-4 py-2 font-black text-[10px] text-indigo-500 uppercase tracking-widest z-20 backdrop-blur-md rounded-br-xl ${isDarkMode ? 'bg-slate-900/80' : 'bg-white/80'}`}>
                                                         {getRelativeDateLabel(day.id)}
                                                     </div>
@@ -1109,7 +1169,6 @@ function AppInternal() {
                             </div>
                         </section>
 
-                        {/* VERSCHIL UIT VORIGE UPDATE: Versiegeschiedenis Overzicht */}
                         <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                             <div className="flex items-center gap-3 mb-2">
                                 <History size={20} className="text-blue-500" />
@@ -1135,17 +1194,6 @@ function AppInternal() {
                         </section>
 
                         <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-2">
-                                <FlaskConical size={20} className="text-orange-500" />
-                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Testen</h3>
-                            </div>
-                            <div className="grid gap-2">
-                                <button onClick={handleInsertTestData} className={`p-4 rounded-xl border active:scale-95 transition-all font-black text-[10px] uppercase border-slate-50 dark:border-slate-800 text-indigo-600`}>Genereer Test Data (1 week)</button>
-                                <button onClick={handleDeleteAllTestData} className="p-4 rounded-xl border border-rose-100 dark:border-rose-900/30 bg-rose-50 dark:bg-rose-900/20 text-rose-600 flex items-center justify-center gap-2 text-[10px] font-black uppercase active:scale-95" disabled={isSubmitting}><Eraser size={16} /> Wis alle testdata</button>
-                            </div>
-                        </section>
-
-                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                             <div className="flex items-center gap-3 mb-4">
                                 <Database size={20} className="text-emerald-500" />
                                 <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Gegevens</h3>
@@ -1160,6 +1208,35 @@ function AppInternal() {
                                     <ArrowRight size={14} />
                                 </button>
                             </div>
+                        </section>
+                        
+                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <RefreshCw size={20} className="text-orange-500" />
+                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Data Migration</h3>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                If you have data from a previous version of the app, click here to move it to your private account. This is a one-time operation.
+                            </p>
+                            <button onClick={handleMigrateData} disabled={isSubmitting} className="p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 bg-orange-50 dark:bg-orange-900/20 text-orange-600 flex items-center justify-between w-full active:scale-95 transition-all disabled:opacity-50">
+                                <div className="flex items-center gap-3"><span className="text-xs font-black uppercase tracking-widest">Migrate Old Data</span></div>
+                                <ArrowRight size={14} />
+                            </button>
+                        </section>
+
+                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <LogOut size={20} className="text-red-500" />
+                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Account</h3>
+                            </div>
+                            <div className="text-xs p-3 rounded-lg bg-slate-50 dark:bg-slate-800 break-all flex items-center justify-between">
+                                <code>{user.uid}</code>
+                                <button onClick={() => navigator.clipboard.writeText(user.uid).then(() => showToast('UID Gekopieerd!'))} className="p-2 active:scale-90 transition-transform"><Copy size={14} /></button>
+                            </div>
+                            <button onClick={handleSignOut} className="p-4 rounded-xl border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-between w-full active:scale-95 transition-all">
+                                <div className="flex items-center gap-3"><span className="text-xs font-black uppercase tracking-widest">Uitloggen</span></div>
+                                <ArrowRight size={14} />
+                            </button>
                         </section>
 
                         <section className="text-center opacity-30 mt-6"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">v{APP_VERSION}</p></section>
