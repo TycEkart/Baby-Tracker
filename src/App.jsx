@@ -5,7 +5,7 @@ import { getAnalytics } from "firebase/analytics";
 
 import {
     getFirestore, collection, addDoc, onSnapshot, doc, getDoc,
-    setDoc, deleteDoc, updateDoc, Timestamp, getDocs, writeBatch
+    setDoc, deleteDoc, updateDoc, Timestamp, getDocs, writeBatch, runTransaction
 } from 'firebase/firestore';
 import {
     getAuth, onAuthStateChanged,
@@ -17,17 +17,16 @@ import {
     Tag, Zap, Filter, Utensils, Settings, ShieldCheck, Heart, RefreshCw,
     ArrowLeft, ArrowRight, Moon, Sun, ChevronLeft, ChevronRight, FlaskConical,
     CheckCircle2, FileCode2, ChevronDown, ChevronUp, Eraser, Sparkles, AlertCircle,
-    Eye, EyeOff, Bug, LogOut, Copy
+    Eye, EyeOff, Bug, LogOut, Copy, Users
 } from 'lucide-react';
 
 // --- CONFIGURATIE ---
-const APP_VERSION = '1.80.0';
+const APP_VERSION = '1.81.0';
 
 const VERSION_HISTORY = [
+    { version: '1.81.0', notes: ['Implemented shared accounts for data sharing.'] },
     { version: '1.80.0', notes: ['Added unauthorized user screen for easier setup.'] },
     { version: '1.79.1', notes: ['Fixed bug in data migration tool.'] },
-    { version: '1.79.0', notes: ['Added one-time data migration tool.'] },
-    { version: '1.78.0', notes: ['Implemented user-specific data and security rules.', 'Added Google Sign-In and a sign-out button.'] },
 ];
 
 // Your web app's Firebase configuration
@@ -188,8 +187,8 @@ function UnauthorizedScreen({ user, isDarkMode }) {
         <div className={`min-h-screen flex items-center justify-center p-6 text-center font-sans ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
             <div className={`p-8 rounded-[2rem] shadow-2xl max-w-sm w-full space-y-4 border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <AlertTriangle className="text-orange-500 mx-auto" size={48} />
-                <h1 className="text-lg font-black uppercase tracking-tight">Access Denied</h1>
-                <p className="text-xs opacity-60">You are not authorized to use this application. Please contact the administrator and provide them with your User ID to request access.</p>
+                <h1 className="text-lg font-black uppercase tracking-tight">Access Required</h1>
+                <p className="text-xs opacity-60">To use this app, you must be invited by an existing account owner. Please provide them with your User ID to request access.</p>
                 <div className="text-xs p-3 rounded-lg bg-slate-100 dark:bg-slate-800 break-all flex items-center justify-between">
                     <code>{user.uid}</code>
                     <button onClick={() => navigator.clipboard.writeText(user.uid).then(() => showToast('UID Copied!'))} className="p-2 active:scale-90 transition-transform"><Copy size={14} /></button>
@@ -205,7 +204,7 @@ function UnauthorizedScreen({ user, isDarkMode }) {
 function AppInternal() {
     // --- STATE ---
     const [user, setUser] = useState(null);
-    const [isAuthorized, setIsAuthorized] = useState(false);
+    const [account, setAccount] = useState(null);
     const [activeTab, setActiveTab] = useState('log');
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -214,6 +213,7 @@ function AppInternal() {
     const [isDarkMode, setIsDarkMode] = useState(isEveningTime());
     const [toast, setToast] = useState(null);
     const [now, setNow] = useState(new Date());
+    const [newMemberUid, setNewMemberUid] = useState('');
 
     // Settings
     const [vitRequirements, setVitRequirements] = useState({ d: false, k: false });
@@ -277,7 +277,7 @@ function AppInternal() {
 
     const handleSave = async (e) => {
         if (e) e.preventDefault();
-        if (!user || !db || isSubmitting) return;
+        if (!user || !db || isSubmitting || !account) return;
         setIsSubmitting(true);
         try {
             const payload = {
@@ -293,10 +293,10 @@ function AppInternal() {
 
             let finalId = editingId;
             if (editingId) {
-                await updateDoc(doc(db, 'users', user.uid, 'baby_logs', editingId), payload);
+                await updateDoc(doc(db, 'accounts', account.id, 'baby_logs', editingId), payload);
             } else {
                 payload.createdAt = Timestamp.now();
-                const docRef = await addDoc(collection(db, 'users', user.uid, 'baby_logs'), payload);
+                const docRef = await addDoc(collection(db, 'accounts', account.id, 'baby_logs'), payload);
                 finalId = docRef.id;
             }
 
@@ -348,9 +348,9 @@ function AppInternal() {
     };
 
     const confirmDelete = async () => {
-        if (!itemToDelete || !db || !user) return;
+        if (!itemToDelete || !db || !user || !account) return;
         try {
-            await deleteDoc(doc(db, 'users', user.uid, 'baby_logs', itemToDelete));
+            await deleteDoc(doc(db, 'accounts', account.id, 'baby_logs', itemToDelete));
             setItemToDelete(null);
             showToast("Verwijderd");
         } catch (err) {
@@ -367,24 +367,24 @@ function AppInternal() {
     const toggleDarkMode = async () => {
         const newVal = !isDarkMode;
         setIsDarkMode(newVal);
-        if (user && db) {
-            await setDoc(doc(db, 'users', user.uid, 'settings', 'appearance'), { isDarkMode: newVal }, { merge: true });
+        if (user && db && account) {
+            await setDoc(doc(db, 'accounts', account.id, 'settings', 'appearance'), { isDarkMode: newVal }, { merge: true });
         }
     };
 
     const toggleVisibility = async (key) => {
         const newVis = { ...visibilitySettings, [key]: !visibilitySettings[key] };
         setVisibilitySettings(newVis);
-        if (user && db) {
-            await setDoc(doc(db, 'users', user.uid, 'settings', 'visibility'), newVis, { merge: true });
+        if (user && db && account) {
+            await setDoc(doc(db, 'accounts', account.id, 'settings', 'visibility'), newVis, { merge: true });
         }
     };
 
     const toggleRequirement = async (key) => {
         const newReqs = { ...vitRequirements, [key]: !vitRequirements[key] };
         setVitRequirements(newReqs);
-        if (user && db) {
-            await setDoc(doc(db, 'users', user.uid, 'settings', 'vitamin_requirements'), newReqs, { merge: true });
+        if (user && db && account) {
+            await setDoc(doc(db, 'accounts', account.id, 'settings', 'vitamin_requirements'), newReqs, { merge: true });
         }
     };
 
@@ -393,13 +393,13 @@ function AppInternal() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `baby-tracker-backup-${user.uid}.json`;
+        link.download = `baby-tracker-backup-${account.id}.json`;
         link.click();
     };
 
     const handleImport = (e) => {
         const file = e.target.files[0];
-        if (!file || !db || !user) return;
+        if (!file || !db || !user || !account) return;
         const reader = new FileReader();
         reader.onload = async (ev) => {
             try {
@@ -409,7 +409,7 @@ function AppInternal() {
                 for (const item of data) {
                     if (item.timestamp) {
                         const { id, ...rest } = item;
-                        await addDoc(collection(db, 'users', user.uid, 'baby_logs'), { ...rest, createdAt: Timestamp.now() });
+                        await addDoc(collection(db, 'accounts', account.id, 'baby_logs'), { ...rest, createdAt: Timestamp.now() });
                     }
                 }
                 showToast("Import geslaagd");
@@ -428,41 +428,28 @@ function AppInternal() {
         }
     };
 
-    const handleMigrateData = async () => {
-        if (!user || !db) return;
-
+    const handleAddMember = async () => {
+        if (!db || !account || !newMemberUid) return;
         setIsSubmitting(true);
-        setDbError(null);
-        showToast("Starting migration...", "info");
-
-        const oldAppId = '1xGoR2vsd3kdZukzvzF9Y8RXxumMv_W7yX4TtMF2Zc4Y';
-        const oldLogsRef = collection(db, 'artifacts', oldAppId, 'public', 'data', 'baby_logs');
-        const newLogsRef = collection(db, 'users', user.uid, 'baby_logs');
-
         try {
-            const oldLogsSnapshot = await getDocs(oldLogsRef);
-            if (oldLogsSnapshot.empty) {
-                showToast("No old data found to migrate.", "info");
-                setIsSubmitting(false);
-                return;
-            }
+            await runTransaction(db, async (transaction) => {
+                const accountRef = doc(db, 'accounts', account.id);
+                const userProfileRef = doc(db, 'user_profiles', newMemberUid);
 
-            const batch = writeBatch(db);
+                // Add member to the account
+                transaction.update(accountRef, {
+                    [`members.${newMemberUid}`]: 'member'
+                });
 
-            oldLogsSnapshot.forEach(logDoc => {
-                const oldData = logDoc.data();
-                const newDocRef = doc(newLogsRef);
-                batch.set(newDocRef, oldData);
-                batch.delete(logDoc.ref);
+                // Create a profile for the new user so they know which account they belong to
+                transaction.set(userProfileRef, {
+                    accountId: account.id
+                });
             });
-
-            await batch.commit();
-
-            showToast("Migration successful!", "success");
-
+            setNewMemberUid('');
+            showToast('Member added successfully!');
         } catch (err) {
-            console.error("Migration failed:", err);
-            setDbError(`Migration Error: ${err.message}. Check Firestore rules.`);
+            setDbError(`Failed to add member: ${err.message}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -476,13 +463,18 @@ function AppInternal() {
             setLoading(true);
             if (currentUser) {
                 setUser(currentUser);
-                const authorizedDocRef = doc(db, 'authorized_users', currentUser.uid);
-                try {
-                    const authorizedDocSnap = await getDoc(authorizedDocRef);
-                    if (authorizedDocSnap.exists()) {
-                        setIsAuthorized(true);
+                const userProfileRef = doc(db, 'user_profiles', currentUser.uid);
+                const userProfileSnap = await getDoc(userProfileRef);
+
+                if (userProfileSnap.exists()) {
+                    const { accountId } = userProfileSnap.data();
+                    const accountRef = doc(db, 'accounts', accountId);
+                    const accountSnap = await getDoc(accountRef);
+                    if (accountSnap.exists()) {
+                        setAccount({ id: accountSnap.id, ...accountSnap.data() });
+                        // Load shared settings
                         const loadSet = async (path, setter) => {
-                            const snap = await getDoc(doc(db, 'users', currentUser.uid, 'settings', path));
+                            const snap = await getDoc(doc(db, 'accounts', accountId, 'settings', path));
                             if (snap.exists()) setter(snap.data());
                         };
                         await Promise.all([
@@ -491,15 +483,35 @@ function AppInternal() {
                             loadSet('vitamin_requirements', (d) => setVitRequirements(d))
                         ]);
                     } else {
-                        setIsAuthorized(false);
+                        setAccount(null); // Account deleted or data inconsistency
                     }
-                } catch (err) {
-                    setDbError(`Auth Check Error: ${err.message}`);
-                    setIsAuthorized(false);
+                } else {
+                    // This is a new user who hasn't been invited to an account yet.
+                    // Or, this is a user who should create their own account.
+                    // For simplicity, we'll assume the first user to ever sign in creates the first account.
+                    const accountsQuery = await getDocs(collection(db, 'accounts'));
+                    if (accountsQuery.empty) {
+                        // No accounts exist, this is the very first user. Create an account for them.
+                        const newAccountRef = doc(collection(db, 'accounts'));
+                        await writeBatch(db)
+                            .set(newAccountRef, {
+                                owner: currentUser.uid,
+                                members: {
+                                    [currentUser.uid]: 'owner'
+                                },
+                                createdAt: Timestamp.now()
+                            })
+                            .set(userProfileRef, { accountId: newAccountRef.id })
+                            .commit();
+                        const newAccountSnap = await getDoc(newAccountRef);
+                        setAccount({ id: newAccountSnap.id, ...newAccountSnap.data() });
+                    } else {
+                        setAccount(null); // User is not associated with any account
+                    }
                 }
             } else {
                 setUser(null);
-                setIsAuthorized(false);
+                setAccount(null);
                 setLogs([]);
             }
             setLoading(false);
@@ -511,11 +523,11 @@ function AppInternal() {
 
     // --- DATA SYNC ---
     useEffect(() => {
-        if (!user || !db || !isAuthorized) {
+        if (!user || !db || !account) {
             setLogs([]);
             return;
         };
-        const colRef = collection(db, 'users', user.uid, 'baby_logs');
+        const colRef = collection(db, 'accounts', account.id, 'baby_logs');
         const unsub = onSnapshot(colRef, (snap) => {
             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
                 .filter(l => l && l.timestamp)
@@ -527,7 +539,7 @@ function AppInternal() {
             setDbStatus('offline');
         });
         return () => unsub();
-    }, [user, isAuthorized]);
+    }, [user, account]);
 
     useEffect(() => {
         const timer = setInterval(() => setNow(new Date()), 60000);
@@ -535,6 +547,8 @@ function AppInternal() {
     }, []);
 
     // --- MEMOS & COMPUTED STATE ---
+    const isOwner = useMemo(() => user && account && account.owner === user.uid, [user, account]);
+
     const typeIntervals = useMemo(() => {
         const sorted = [...logs].sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
         const result = {};
@@ -722,7 +736,7 @@ function AppInternal() {
         return <LoginScreen isDarkMode={isDarkMode} />;
     }
 
-    if (!isAuthorized) {
+    if (!account) {
         return <UnauthorizedScreen user={user} isDarkMode={isDarkMode} />;
     }
 
@@ -1170,24 +1184,29 @@ function AppInternal() {
                         </section>
 
                         <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-2">
-                                <History size={20} className="text-blue-500" />
-                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Versiegeschiedenis</h3>
+                            <div className="flex items-center gap-3 mb-4">
+                                <Users size={20} className="text-cyan-500" />
+                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Account Members</h3>
                             </div>
-                            <div className="space-y-3">
-                                {VERSION_HISTORY.map((v, i) => (
-                                    <div key={v.version} className={`p-3 rounded-xl border ${isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-100 bg-slate-50'}`}>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-[11px] font-black text-blue-500">v{v.version}</span>
-                                            {i === 0 && <span className="text-[8px] font-bold uppercase bg-blue-500 text-white px-1.5 py-0.5 rounded-md">Nieuw</span>}
-                                        </div>
-                                        <ul className="space-y-1">
-                                            {v.notes.map((note, idx) => (
-                                                <li key={idx} className="text-[10px] text-slate-600 dark:text-slate-400 flex items-start gap-1.5">
-                                                    <span className="opacity-50 mt-0.5">•</span> {note}
-                                                </li>
-                                            ))}
-                                        </ul>
+                            {isOwner && (
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newMemberUid}
+                                        onChange={(e) => setNewMemberUid(e.target.value)}
+                                        placeholder="Enter new member's UID"
+                                        className="flex-grow p-2 rounded-lg text-xs bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                                    />
+                                    <button onClick={handleAddMember} disabled={isSubmitting} className="p-2 bg-cyan-600 text-white rounded-lg active:scale-95 transition-transform disabled:opacity-50">
+                                        <Plus size={16} />
+                                    </button>
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                {Object.entries(account.members).map(([uid, role]) => (
+                                    <div key={uid} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                                        <span className="text-xs font-mono truncate opacity-70">{uid}</span>
+                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${role === 'owner' ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>{role}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1209,29 +1228,11 @@ function AppInternal() {
                                 </button>
                             </div>
                         </section>
-                        
-                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <RefreshCw size={20} className="text-orange-500" />
-                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Data Migration</h3>
-                            </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                If you have data from a previous version of the app, click here to move it to your private account. This is a one-time operation.
-                            </p>
-                            <button onClick={handleMigrateData} disabled={isSubmitting} className="p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 bg-orange-50 dark:bg-orange-900/20 text-orange-600 flex items-center justify-between w-full active:scale-95 transition-all disabled:opacity-50">
-                                <div className="flex items-center gap-3"><span className="text-xs font-black uppercase tracking-widest">Migrate Old Data</span></div>
-                                <ArrowRight size={14} />
-                            </button>
-                        </section>
 
                         <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                             <div className="flex items-center gap-3 mb-4">
                                 <LogOut size={20} className="text-red-500" />
                                 <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Account</h3>
-                            </div>
-                            <div className="text-xs p-3 rounded-lg bg-slate-50 dark:bg-slate-800 break-all flex items-center justify-between">
-                                <code>{user.uid}</code>
-                                <button onClick={() => navigator.clipboard.writeText(user.uid).then(() => showToast('UID Gekopieerd!'))} className="p-2 active:scale-90 transition-transform"><Copy size={14} /></button>
                             </div>
                             <button onClick={handleSignOut} className="p-4 rounded-xl border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-between w-full active:scale-95 transition-all">
                                 <div className="flex items-center gap-3"><span className="text-xs font-black uppercase tracking-widest">Uitloggen</span></div>
