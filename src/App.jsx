@@ -21,12 +21,12 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURATIE ---
-const APP_VERSION = '1.81.0';
+const APP_VERSION = '1.81.3';
 
 const VERSION_HISTORY = [
-    { version: '1.81.0', notes: ['Implemented shared accounts for data sharing.'] },
-    { version: '1.80.0', notes: ['Added unauthorized user screen for easier setup.'] },
-    { version: '1.79.1', notes: ['Fixed bug in data migration tool.'] },
+    { version: '1.81.3', notes: ['Improved logging and error handling for account creation.'] },
+    { version: '1.81.2', notes: ['Fixed TypeError when accountId is undefined in user profile.'] },
+    { version: '1.81.1', notes: ['Fixed permission error on initial account creation.'] },
 ];
 
 // Your web app's Firebase configuration
@@ -174,7 +174,7 @@ function LoginScreen({ onLogin, isDarkMode }) {
     );
 }
 
-function UnauthorizedScreen({ user, isDarkMode }) {
+function UnauthorizedScreen({ user, isDarkMode, onRetry }) {
     const showToast = (msg) => {
         const toastEl = document.createElement('div');
         toastEl.className = "fixed top-20 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-full duration-500";
@@ -188,13 +188,16 @@ function UnauthorizedScreen({ user, isDarkMode }) {
             <div className={`p-8 rounded-[2rem] shadow-2xl max-w-sm w-full space-y-4 border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <AlertTriangle className="text-orange-500 mx-auto" size={48} />
                 <h1 className="text-lg font-black uppercase tracking-tight">Access Required</h1>
-                <p className="text-xs opacity-60">To use this app, you must be invited by an existing account owner. Please provide them with your User ID to request access.</p>
+                <p className="text-xs opacity-60">To use this app, you must be invited by an existing account owner. Please provide them with your User ID to request access. If you are the first user, click "Create Account".</p>
                 <div className="text-xs p-3 rounded-lg bg-slate-100 dark:bg-slate-800 break-all flex items-center justify-between">
                     <code>{user.uid}</code>
                     <button onClick={() => navigator.clipboard.writeText(user.uid).then(() => showToast('UID Copied!'))} className="p-2 active:scale-90 transition-transform"><Copy size={14} /></button>
                 </div>
-                <button onClick={() => signOut(auth)} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-red-500/20">
-                    <LogOut size={16} /> Sign Out
+                <button onClick={onRetry} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
+                    Create Account / Retry
+                </button>
+                <button onClick={() => signOut(auth)} className="w-full py-3 text-xs text-slate-500 font-bold uppercase">
+                    Sign Out
                 </button>
             </div>
         </div>
@@ -205,6 +208,7 @@ function AppInternal() {
     // --- STATE ---
     const [user, setUser] = useState(null);
     const [account, setAccount] = useState(null);
+    const [authAttempt, setAuthAttempt] = useState(0);
     const [activeTab, setActiveTab] = useState('log');
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -436,12 +440,9 @@ function AppInternal() {
                 const accountRef = doc(db, 'accounts', account.id);
                 const userProfileRef = doc(db, 'user_profiles', newMemberUid);
 
-                // Add member to the account
                 transaction.update(accountRef, {
                     [`members.${newMemberUid}`]: 'member'
                 });
-
-                // Create a profile for the new user so they know which account they belong to
                 transaction.set(userProfileRef, {
                     accountId: account.id
                 });
@@ -464,50 +465,40 @@ function AppInternal() {
             if (currentUser) {
                 setUser(currentUser);
                 const userProfileRef = doc(db, 'user_profiles', currentUser.uid);
-                const userProfileSnap = await getDoc(userProfileRef);
+                try {
+                    const userProfileSnap = await getDoc(userProfileRef);
 
-                if (userProfileSnap.exists()) {
-                    const { accountId } = userProfileSnap.data();
-                    const accountRef = doc(db, 'accounts', accountId);
-                    const accountSnap = await getDoc(accountRef);
-                    if (accountSnap.exists()) {
-                        setAccount({ id: accountSnap.id, ...accountSnap.data() });
-                        // Load shared settings
-                        const loadSet = async (path, setter) => {
-                            const snap = await getDoc(doc(db, 'accounts', accountId, 'settings', path));
-                            if (snap.exists()) setter(snap.data());
-                        };
-                        await Promise.all([
-                            loadSet('appearance', (d) => setIsDarkMode(!!d.isDarkMode)),
-                            loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
-                            loadSet('vitamin_requirements', (d) => setVitRequirements(d))
-                        ]);
+                    if (userProfileSnap.exists()) {
+                        const userProfileData = userProfileSnap.data();
+                        const accountId = userProfileData?.accountId;
+
+                        if (accountId && typeof accountId === 'string') {
+                            const accountRef = doc(db, 'accounts', accountId);
+                            const accountSnap = await getDoc(accountRef);
+                            if (accountSnap.exists()) {
+                                setAccount({ id: accountSnap.id, ...accountSnap.data() });
+                                const loadSet = async (path, setter) => {
+                                    const snap = await getDoc(doc(db, 'accounts', accountId, 'settings', path));
+                                    if (snap.exists()) setter(snap.data());
+                                };
+                                await Promise.all([
+                                    loadSet('appearance', (d) => setIsDarkMode(!!d.isDarkMode)),
+                                    loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
+                                    loadSet('vitamin_requirements', (d) => setVitRequirements(d))
+                                ]);
+                            } else {
+                                setAccount(null);
+                            }
+                        } else {
+                            setAccount(null);
+                        }
                     } else {
-                        setAccount(null); // Account deleted or data inconsistency
+                        setAccount(null);
                     }
-                } else {
-                    // This is a new user who hasn't been invited to an account yet.
-                    // Or, this is a user who should create their own account.
-                    // For simplicity, we'll assume the first user to ever sign in creates the first account.
-                    const accountsQuery = await getDocs(collection(db, 'accounts'));
-                    if (accountsQuery.empty) {
-                        // No accounts exist, this is the very first user. Create an account for them.
-                        const newAccountRef = doc(collection(db, 'accounts'));
-                        await writeBatch(db)
-                            .set(newAccountRef, {
-                                owner: currentUser.uid,
-                                members: {
-                                    [currentUser.uid]: 'owner'
-                                },
-                                createdAt: Timestamp.now()
-                            })
-                            .set(userProfileRef, { accountId: newAccountRef.id })
-                            .commit();
-                        const newAccountSnap = await getDoc(newAccountRef);
-                        setAccount({ id: newAccountSnap.id, ...newAccountSnap.data() });
-                    } else {
-                        setAccount(null); // User is not associated with any account
-                    }
+                } catch (err) {
+                    console.error("Auth check failed:", err);
+                    setDbError(`Auth Check Error: ${err.message}`);
+                    setAccount(null);
                 }
             } else {
                 setUser(null);
@@ -518,7 +509,41 @@ function AppInternal() {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [authAttempt]);
+
+    const createInitialAccount = async () => {
+        if (!user) {
+            console.error("Create account called without a user.");
+            return;
+        }
+        console.log("Attempting to create initial account for user:", user.uid);
+        setLoading(true);
+        setDbError(null);
+        try {
+            const newAccountRef = doc(collection(db, 'accounts'));
+            console.log("Step 1: Creating new account document with ID:", newAccountRef.id);
+            await setDoc(newAccountRef, {
+                owner: user.uid,
+                members: { [user.uid]: 'owner' },
+                createdAt: Timestamp.now()
+            });
+            console.log("Step 1 successful.");
+
+            const userProfileRef = doc(db, 'user_profiles', user.uid);
+            console.log("Step 2: Creating user profile document for account:", newAccountRef.id);
+            await setDoc(userProfileRef, { accountId: newAccountRef.id });
+            console.log("Step 2 successful.");
+
+            console.log("Account created successfully. Re-triggering auth check.");
+            setAuthAttempt(c => c + 1);
+        } catch (err) {
+            console.error("Account Creation Error:", err);
+            setDbError(`Account Creation Error: ${err.message}`);
+        } finally {
+            console.log("Finished create account attempt.");
+            setLoading(false);
+        }
+    };
 
 
     // --- DATA SYNC ---
@@ -737,7 +762,7 @@ function AppInternal() {
     }
 
     if (!account) {
-        return <UnauthorizedScreen user={user} isDarkMode={isDarkMode} />;
+        return <UnauthorizedScreen user={user} isDarkMode={isDarkMode} onRetry={createInitialAccount} />;
     }
 
     return (
@@ -1248,7 +1273,7 @@ function AppInternal() {
 
             {itemToDelete && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/80 flex items-center justify-center p-6 backdrop-blur-sm">
-                    <div className={`p-6 rounded-[2rem] w-full max-w-xs text-center space-y-4 shadow-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-100 text-slate-900'}`}>
+                    <div className={`p-6 rounded-[2rem] w-full max-w-xs text-center space-y-4 shadow-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                         <Trash2 className="text-red-500 mx-auto" size={32} />
                         <h3 className="font-black text-lg uppercase tracking-tight">Verwijderen?</h3>
                         <div className="grid grid-cols-2 gap-2 pt-2">
