@@ -28,7 +28,7 @@ export function SettingsTab({
     APP_VERSION
 }) {
     return (
-        <div className="space-y-6 animate-in slide-in-from-right-3 duration-300 pb-12 text-slate-800 dark:text-slate-100">
+        <div className="space-y-6 animate-in slide-in-from-right-3 duration-300 pb-12">
             <section className={`p-6 rounded-[2rem] border shadow-sm space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className="flex items-center gap-3 mb-2">
                     <Moon size={20} className="text-indigo-500" />
@@ -43,11 +43,11 @@ export function SettingsTab({
             <section className={`p-6 rounded-[2rem] border shadow-sm space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className="flex items-center gap-3 mb-4">
                     <Eye size={20} className="text-indigo-600" />
-                    <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Zichtbaarheid</h3>
+                    <h3 className="font-black uppercase text-sm tracking-tight">Zichtbaarheid</h3>
                 </div>
                 <div className="space-y-2">
                     {['Fles', 'Borst', 'Vast'].map(key => (
-                        <div key={key} className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-slate-800">
+                        <div key={key} className={`flex items-center justify-between p-3 rounded-xl border ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
                             <span className="text-[11px] font-black uppercase opacity-60">{key}</span>
                             <button onClick={() => toggleVisibility(key)} className={`w-10 h-5 rounded-full relative transition-all ${visibilitySettings[key] ? 'bg-indigo-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${visibilitySettings[key] ? 'left-5.5' : 'left-0.5'}`} /></button>
                         </div>
@@ -58,14 +58,14 @@ export function SettingsTab({
             <section className={`p-6 rounded-[2rem] border shadow-sm space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className="flex items-center gap-3 mb-4">
                     <ShieldCheck size={20} className="text-purple-600" />
-                    <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Doelen</h3>
+                    <h3 className="font-black uppercase text-sm tracking-tight">Doelen</h3>
                 </div>
                 <div className="space-y-2">
-                    <div className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-slate-800">
+                    <div className={`flex items-center justify-between p-3 rounded-xl border ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
                         <span className="text-[11px] font-black uppercase opacity-60">Vitamine D</span>
                         <button onClick={() => toggleRequirement('d')} className={`w-10 h-5 rounded-full relative ${vitRequirements.d ? 'bg-purple-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${vitRequirements.d ? 'left-5.5' : 'left-0.5'}`} /></button>
                     </div>
-                    <div className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-slate-800">
+                    <div className={`flex items-center justify-between p-3 rounded-xl border ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
                         <span className="text-[11px] font-black uppercase opacity-60">Vitamine K</span>
                         <button onClick={() => toggleRequirement('k')} className={`w-10 h-5 rounded-full relative ${vitRequirements.k ? 'bg-purple-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${vitRequirements.k ? 'left-5.5' : 'left-0.5'}`} /></button>
                     </div>
@@ -75,7 +75,7 @@ export function SettingsTab({
             <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className="flex items-center gap-3 mb-4">
                     <Users size={20} className="text-cyan-500" />
-                    <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Account Members</h3>
+                    <h3 className="font-black uppercase text-sm tracking-tight">Account Members</h3>
                 </div>
                 {isOwner && (
                     <div className="flex gap-2">
@@ -84,7 +84,7 @@ export function SettingsTab({
                             value={newMemberUid}
                             onChange={(e) => setNewMemberUid(e.target.value)}
                             placeholder="Enter new member's UID"
-                            className="flex-grow p-2 rounded-lg text-xs bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                            className={`flex-grow p-2 rounded-lg text-xs border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}
                         />
                         <button onClick={handleAddMember} disabled={isSubmitting} className="p-2 bg-cyan-600 text-white rounded-lg active:scale-95 transition-transform disabled:opacity-50">
                             <Plus size={16} />
@@ -93,9 +93,9 @@ export function SettingsTab({
                 )}
                 <div className="space-y-2">
                     {Object.entries(account.members).map(([uid, role]) => (
-                        <div key={uid} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                        <div key={uid} className={`flex items-center justify-between p-2 rounded-lg ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                             <span className="text-xs font-mono truncate opacity-70">{uid}</span>
-                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${role === 'owner' ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>{role}</span>
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${role === 'owner' ? 'bg-amber-500 text-white' : (isDarkMode ? 'bg-slate-700' : 'bg-slate-200')}`}>{role}</span>
                         </div>
                     ))}
                 </div>
@@ -104,14 +104,14 @@ export function SettingsTab({
             <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className="flex items-center gap-3 mb-4">
                     <Database size={20} className="text-emerald-500" />
-                    <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Gegevens</h3>
+                    <h3 className="font-black uppercase text-sm tracking-tight">Gegevens</h3>
                 </div>
-                <div className="grid gap-2 text-indigo-600 dark:text-indigo-400">
-                    <button onClick={handleExport} className="p-4 rounded-xl border border-slate-50 dark:border-slate-800 flex items-center justify-between active:scale-95 transition-all text-indigo-600 dark:text-indigo-400">
+                <div className="grid gap-2">
+                    <button onClick={handleExport} className={`p-4 rounded-xl border flex items-center justify-between active:scale-95 transition-all ${isDarkMode ? 'border-slate-800 text-indigo-400' : 'border-slate-50 text-indigo-600'}`}>
                         <div className="flex items-center gap-3"><Download size={18} /><span className="text-xs font-black uppercase tracking-widest">Backup maken</span></div>
                         <ArrowRight size={14} />
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="p-4 rounded-xl border border-slate-50 dark:border-slate-800 flex items-center justify-between active:scale-95 transition-all text-emerald-600 dark:text-emerald-400">
+                    <button onClick={() => fileInputRef.current?.click()} className={`p-4 rounded-xl border flex items-center justify-between active:scale-95 transition-all ${isDarkMode ? 'border-slate-800 text-emerald-400' : 'border-slate-50 text-emerald-600'}`}>
                         <div className="flex items-center gap-3"><Upload size={18} /><span className="text-xs font-black uppercase tracking-widest">Importeer backup</span></div>
                         <ArrowRight size={14} />
                     </button>
@@ -121,7 +121,7 @@ export function SettingsTab({
             <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className="flex items-center gap-3 mb-4">
                     <LogOut size={20} className="text-red-500" />
-                    <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Account</h3>
+                    <h3 className="font-black uppercase text-sm tracking-tight">Account</h3>
                 </div>
                 <button onClick={handleSignOut} className="p-4 rounded-xl border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-between w-full active:scale-95 transition-all">
                     <div className="flex items-center gap-3"><span className="text-xs font-black uppercase tracking-widest">Uitloggen</span></div>

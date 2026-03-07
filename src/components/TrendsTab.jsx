@@ -39,7 +39,7 @@ export function TrendsTab({
                 <h3 className="text-xs font-black uppercase mb-4 opacity-50 tracking-widest">Weekoverzicht (Gemiddeld per dag)</h3>
                 <div className="grid grid-cols-2 gap-2 mb-6">
                     {Number(weeklyAvgs.totalVoedingen) > 0 && (
-                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-slate-800 dark:text-white">
+                        <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-emerald-900/20 text-white' : 'bg-emerald-50 text-slate-800'}`}>
                             <div className="flex items-center gap-2 text-emerald-500 mb-1">
                                 <Clock size={14} /><span className="text-[10px] font-black uppercase">Totaal Voedingen</span>
                             </div>
@@ -47,7 +47,7 @@ export function TrendsTab({
                         </div>
                     )}
                     {Number(weeklyAvgs.flesCount) > 0 && (
-                        <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl text-slate-800 dark:text-white">
+                        <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-indigo-900/20 text-white' : 'bg-indigo-50 text-slate-800'}`}>
                             <div className="flex items-center gap-2 text-indigo-500 mb-1">
                                 <Milk size={14} /><span className="text-[10px] font-black uppercase">Fles</span>
                             </div>
@@ -55,7 +55,7 @@ export function TrendsTab({
                         </div>
                     )}
                     {Number(weeklyAvgs.borstCount) > 0 && (
-                        <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded-2xl text-slate-800 dark:text-white">
+                        <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-pink-900/20 text-white' : 'bg-pink-50 text-slate-800'}`}>
                             <div className="flex items-center gap-2 text-pink-500 mb-1">
                                 <Heart size={14} /><span className="text-[10px] font-black uppercase">Borst ({weeklyAvgs.borstCount}x)</span>
                             </div>
@@ -63,7 +63,7 @@ export function TrendsTab({
                         </div>
                     )}
                     {Number(weeklyAvgs.vastCount) > 0 && (
-                        <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-2xl text-slate-800 dark:text-white">
+                        <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-orange-900/20 text-white' : 'bg-orange-50 text-slate-800'}`}>
                             <div className="flex items-center gap-2 text-orange-500 mb-1">
                                 <Utensils size={14} /><span className="text-[10px] font-black uppercase">Vast</span>
                             </div>
@@ -82,7 +82,7 @@ export function TrendsTab({
                                 <div className="w-full flex justify-center items-end h-20">
                                     <div style={{ height: `${hPct}%` }} className={`w-3 sm:w-4 rounded-full transition-all duration-300 ${isSelected ? 'bg-indigo-600 shadow-lg' : (hasData ? (day.hasBreastfeeding ? 'bg-pink-400 dark:bg-pink-500/50' : 'bg-indigo-300 dark:bg-slate-700') : 'bg-slate-50 dark:bg-slate-900 opacity-20')}`} />
                                 </div>
-                                <span className={`text-[9px] font-black uppercase ${isSelected ? 'text-indigo-600' : 'opacity-40'}`}>{day.label}</span>
+                                <span className={`text-[9px] font-black uppercase ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'opacity-40'}`}>{day.label}</span>
                             </div>
                         );
                     })}
