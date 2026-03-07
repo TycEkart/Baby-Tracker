@@ -101,7 +101,7 @@ function AppInternal() {
     const [user, setUser] = useState(null);
     const [account, setAccount] = useState(null);
     const [authAttempt, setAuthAttempt] = useState(0);
-    const [activeTab, setActiveTab] = useState('log');
+    const [activeTab, setActiveTab] = useState(window.location.hash.substring(1) || 'log');
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [dbStatus, setDbStatus] = useState('initializing');
@@ -139,6 +139,25 @@ function AppInternal() {
     const timelineScrollRef = useRef(null);
     const isAutoScrollingRef = useRef(false);
     const fileInputRef = useRef(null);
+
+    // --- BROWSER HISTORY INTEGRATION ---
+    useEffect(() => {
+        const handleHashChange = () => {
+            setActiveTab(window.location.hash.substring(1) || 'log');
+        };
+
+        window.addEventListener('popstate', handleHashChange);
+        return () => {
+            window.removeEventListener('popstate', handleHashChange);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (window.location.hash.substring(1) !== activeTab) {
+            window.location.hash = activeTab;
+        }
+    }, [activeTab]);
+
 
     // --- UI UTILITIES ---
     const showToast = (msg, icon = 'success') => {
