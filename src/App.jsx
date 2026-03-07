@@ -1,3 +1,15 @@
+/**
+ * This is the main application component.
+ *
+ * As a "container" or "smart" component, its primary responsibilities are:
+ * 1. Managing the application's state (e.g., user authentication, logs, settings).
+ * 2. Handling business logic and data fetching (e.g., interacting with Firebase).
+ * 3. Passing state and callback functions down to "presentational" child components.
+ *
+ * By centralizing state management here, we make the child components simpler and more reusable.
+ * They receive data as props and notify the parent of events via callback functions. This is a
+ * common and effective pattern in React development.
+ */
 import React, { useState, useEffect, useMemo, useRef, Component } from 'react';
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
@@ -5,7 +17,8 @@ import { getAnalytics } from "firebase/analytics";
 
 import {
     getFirestore, collection, addDoc, onSnapshot, doc, getDoc,
-    setDoc, deleteDoc, updateDoc, Timestamp, getDocs, writeBatch, runTransaction
+    setDoc, deleteDoc, updateDoc, Timestamp, getDocs, writeBatch, runTransaction,
+    query, where
 } from 'firebase/firestore';
 import {
     getAuth, onAuthStateChanged,
@@ -20,13 +33,22 @@ import {
     Eye, EyeOff, Bug, LogOut, Copy, Users
 } from 'lucide-react';
 
+import { isEveningTime, toSafeDate, toLocalDateString, formatDuration, getDiffMinutes, getLocalDateTimeString } from './utils/helpers';
+import { LoginScreen } from './components/LoginScreen';
+import { UnauthorizedScreen } from './components/UnauthorizedScreen';
+import { Header } from './components/Header';
+import { LogForm } from './components/LogForm';
+import { LogList } from './components/LogList';
+import { TrendsTab } from './components/TrendsTab';
+import { SettingsTab } from './components/SettingsTab';
+
 // --- CONFIGURATIE ---
-const APP_VERSION = '1.81.3';
+const APP_VERSION = '1.81.4';
 
 const VERSION_HISTORY = [
+    { version: '1.81.4', notes: ['Refactored account creation to use a transaction for reliability.'] },
     { version: '1.81.3', notes: ['Improved logging and error handling for account creation.'] },
     { version: '1.81.2', notes: ['Fixed TypeError when accountId is undefined in user profile.'] },
-    { version: '1.81.1', notes: ['Fixed permission error on initial account creation.'] },
 ];
 
 // Your web app's Firebase configuration
@@ -46,70 +68,6 @@ const analytics = getAnalytics(app);
 
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
-
-// --- HELPERS ---
-const isEveningTime = () => {
-    const hour = new Date().getHours();
-    return hour >= 19 || hour < 8;
-};
-
-const toSafeDate = (input) => {
-    if (!input) return new Date();
-    if (typeof input === 'object' && input !== null && 'seconds' in input) {
-        return new Date(input.seconds * 1000);
-    }
-    const d = new Date(input);
-    return isNaN(d.getTime()) ? new Date() : d;
-};
-
-const toLocalDateString = (dateInput) => {
-    const d = toSafeDate(dateInput);
-    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
-};
-
-const formatTime = (date) => {
-    return toSafeDate(date).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-};
-
-const formatDateTimeFull = (dateInput) => {
-    const d = toSafeDate(dateInput);
-    return `${d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}, ${formatTime(d)}`;
-};
-
-const getRelativeDateLabel = (dateStr) => {
-    const today = toLocalDateString(new Date());
-    const yesterday = toLocalDateString(new Date(Date.now() - 86400000));
-    if (dateStr === today) return "Vandaag";
-    if (dateStr === yesterday) return "Gisteren";
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
-};
-
-const getDiffMinutes = (start, end) => {
-    const s = toSafeDate(start).getTime();
-    const e = toSafeDate(end).getTime();
-    return Math.floor((e - s) / 60000);
-};
-
-const formatDuration = (mins) => {
-    if (mins < 0 || isNaN(mins)) return "0m";
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return h > 0 ? `${h}u ${m}m` : `${m}m`;
-};
-
-const getLocalDateTimeString = (date = new Date()) => {
-    const d = toSafeDate(date);
-    const tzoffset = d.getTimezoneOffset() * 60000;
-    return new Date(d.getTime() - tzoffset).toISOString().slice(0, 16);
-};
-
-const PoopIcon = ({ className }) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <path d="M7 15a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3V9a3 3 0 0 0-3-3h-4a3 3 0 0 0-3 3v6Z" />
-        <path d="M17 10c.5-1 2.5-1 3 0M4 10c-.5-1-2.5-1-3 0M10 6c0-1.5 1-2.5 2-2.5s2 1 2 2.5" />
-    </svg>
-);
 
 // --- ERROR BOUNDARY ---
 class ErrorBoundary extends Component {
@@ -136,72 +94,6 @@ class ErrorBoundary extends Component {
         }
         return this.props.children;
     }
-}
-
-function LoginScreen({ onLogin, isDarkMode }) {
-    const handleGoogleSignIn = async () => {
-        if (!auth) return;
-        const provider = new GoogleAuthProvider();
-        try {
-            await signInWithPopup(auth, provider);
-        } catch (error) {
-            console.error("Google Sign-In Error:", error);
-        }
-    };
-
-    return (
-        <div className={`min-h-screen flex items-center justify-center p-6 text-center font-sans ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
-            <div className={`p-8 rounded-[2rem] shadow-2xl max-w-sm w-full space-y-6 border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <div className="flex flex-col items-center gap-2">
-                    <Baby size={48} className="text-indigo-500" />
-                    <h1 className="text-2xl font-black tracking-tight">Baby Tracker</h1>
-                    <p className="text-sm opacity-60">Log and track your baby's activities.</p>
-                </div>
-                <button
-                    onClick={handleGoogleSignIn}
-                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase flex items-center justify-center gap-3 shadow-lg shadow-indigo-500/20"
-                >
-                    <svg className="w-5 h-5" viewBox="0 0 48 48">
-                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
-                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
-                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
-                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C41.38,36.218,44,30.668,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
-                    </svg>
-                    Sign In with Google
-                </button>
-            </div>
-        </div>
-    );
-}
-
-function UnauthorizedScreen({ user, isDarkMode, onRetry }) {
-    const showToast = (msg) => {
-        const toastEl = document.createElement('div');
-        toastEl.className = "fixed top-20 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-full duration-500";
-        toastEl.innerHTML = `<div class="px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border ${isDarkMode ? 'bg-indigo-900 border-indigo-500' : 'bg-indigo-600 border-indigo-500'} text-white"><span class="font-black text-[11px] uppercase tracking-widest">${msg}</span></div>`;
-        document.body.appendChild(toastEl);
-        setTimeout(() => document.body.removeChild(toastEl), 3500);
-    };
-
-    return (
-        <div className={`min-h-screen flex items-center justify-center p-6 text-center font-sans ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
-            <div className={`p-8 rounded-[2rem] shadow-2xl max-w-sm w-full space-y-4 border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <AlertTriangle className="text-orange-500 mx-auto" size={48} />
-                <h1 className="text-lg font-black uppercase tracking-tight">Access Required</h1>
-                <p className="text-xs opacity-60">To use this app, you must be invited by an existing account owner. Please provide them with your User ID to request access. If you are the first user, click "Create Account".</p>
-                <div className="text-xs p-3 rounded-lg bg-slate-100 dark:bg-slate-800 break-all flex items-center justify-between">
-                    <code>{user.uid}</code>
-                    <button onClick={() => navigator.clipboard.writeText(user.uid).then(() => showToast('UID Copied!'))} className="p-2 active:scale-90 transition-transform"><Copy size={14} /></button>
-                </div>
-                <button onClick={onRetry} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
-                    Create Account / Retry
-                </button>
-                <button onClick={() => signOut(auth)} className="w-full py-3 text-xs text-slate-500 font-bold uppercase">
-                    Sign Out
-                </button>
-            </div>
-        </div>
-    );
 }
 
 function AppInternal() {
@@ -436,16 +328,9 @@ function AppInternal() {
         if (!db || !account || !newMemberUid) return;
         setIsSubmitting(true);
         try {
-            await runTransaction(db, async (transaction) => {
-                const accountRef = doc(db, 'accounts', account.id);
-                const userProfileRef = doc(db, 'user_profiles', newMemberUid);
-
-                transaction.update(accountRef, {
-                    [`members.${newMemberUid}`]: 'member'
-                });
-                transaction.set(userProfileRef, {
-                    accountId: account.id
-                });
+            const accountRef = doc(db, 'accounts', account.id);
+            await updateDoc(accountRef, {
+                [`members.${newMemberUid}`]: 'member'
             });
             setNewMemberUid('');
             showToast('Member added successfully!');
@@ -464,34 +349,28 @@ function AppInternal() {
             setLoading(true);
             if (currentUser) {
                 setUser(currentUser);
-                const userProfileRef = doc(db, 'user_profiles', currentUser.uid);
                 try {
-                    const userProfileSnap = await getDoc(userProfileRef);
+                    // Query the 'accounts' collection to find the account the user belongs to.
+                    const accountsRef = collection(db, 'accounts');
+                    const q = query(accountsRef, where(`members.${currentUser.uid}`, '!=', null));
+                    const querySnapshot = await getDocs(q);
 
-                    if (userProfileSnap.exists()) {
-                        const userProfileData = userProfileSnap.data();
-                        const accountId = userProfileData?.accountId;
+                    if (!querySnapshot.empty) {
+                        // Assuming a user can only be a member of one account.
+                        const accountDoc = querySnapshot.docs[0];
+                        const accountId = accountDoc.id;
+                        setAccount({ id: accountId, ...accountDoc.data() });
 
-                        if (accountId && typeof accountId === 'string') {
-                            const accountRef = doc(db, 'accounts', accountId);
-                            const accountSnap = await getDoc(accountRef);
-                            if (accountSnap.exists()) {
-                                setAccount({ id: accountSnap.id, ...accountSnap.data() });
-                                const loadSet = async (path, setter) => {
-                                    const snap = await getDoc(doc(db, 'accounts', accountId, 'settings', path));
-                                    if (snap.exists()) setter(snap.data());
-                                };
-                                await Promise.all([
-                                    loadSet('appearance', (d) => setIsDarkMode(!!d.isDarkMode)),
-                                    loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
-                                    loadSet('vitamin_requirements', (d) => setVitRequirements(d))
-                                ]);
-                            } else {
-                                setAccount(null);
-                            }
-                        } else {
-                            setAccount(null);
-                        }
+                        // Load user-specific settings
+                        const loadSet = async (path, setter) => {
+                            const snap = await getDoc(doc(db, 'accounts', accountId, 'settings', path));
+                            if (snap.exists()) setter(snap.data());
+                        };
+                        await Promise.all([
+                            loadSet('appearance', (d) => setIsDarkMode(!!d.isDarkMode)),
+                            loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
+                            loadSet('vitamin_requirements', (d) => setVitRequirements(d))
+                        ]);
                     } else {
                         setAccount(null);
                     }
@@ -520,21 +399,16 @@ function AppInternal() {
         setLoading(true);
         setDbError(null);
         try {
+            // With the new data model, we only need to create a single 'account' document.
+            // The security rules for account creation are now simple and robust.
             const newAccountRef = doc(collection(db, 'accounts'));
-            console.log("Step 1: Creating new account document with ID:", newAccountRef.id);
             await setDoc(newAccountRef, {
                 owner: user.uid,
                 members: { [user.uid]: 'owner' },
                 createdAt: Timestamp.now()
             });
-            console.log("Step 1 successful.");
 
-            const userProfileRef = doc(db, 'user_profiles', user.uid);
-            console.log("Step 2: Creating user profile document for account:", newAccountRef.id);
-            await setDoc(userProfileRef, { accountId: newAccountRef.id });
-            console.log("Step 2 successful.");
-
-            console.log("Account created successfully. Re-triggering auth check.");
+            console.log("Account creation successful. Re-triggering auth check.");
             setAuthAttempt(c => c + 1);
         } catch (err) {
             console.error("Account Creation Error:", err);
@@ -668,7 +542,7 @@ function AppInternal() {
             borstL: Math.round(hist.reduce((s, d) => s + d.items.reduce((acc, i) => acc + (Number(i.amountLeft) || 0), 0), 0) / count),
             borstR: Math.round(hist.reduce((s, d) => s + d.items.reduce((acc, i) => acc + (Number(i.amountRight) || 0), 0), 0) / count),
             vastCount: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Vast').length, 0) / count).toFixed(1),
-            vastAmount: Math.round(hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Vast').reduce((acc, i) => acc + (Number(i.amount) || 0), 0), 0) / count),
+            vastAmount: Math.round(hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Vast').reduce((acc, i) => acc + (Number(i.amount) || 0), 0), 0) / count)
         };
     }, [trendsChartData]);
 
@@ -702,18 +576,6 @@ function AppInternal() {
             }
         };
     }, [trendsChartData, selectedDayId]);
-
-    const getIntervalStyle = (cat, isDark) => {
-        switch(cat) {
-            case 'Borst': return isDark ? 'text-pink-400 bg-pink-500/10 border-pink-500/20' : 'text-pink-600 bg-pink-50 border-pink-100';
-            case 'Fles': return isDark ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' : 'text-indigo-600 bg-indigo-50 border-indigo-100';
-            case 'Vast': return isDark ? 'text-orange-400 bg-orange-500/10 border-orange-500/20' : 'text-orange-600 bg-orange-50 border-orange-100';
-            case 'poep': return isDark ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-amber-700 bg-amber-50 border-amber-100';
-            case 'plas': return isDark ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' : 'text-yellow-600 bg-yellow-50 border-yellow-100';
-            case 'vitamins': return isDark ? 'text-purple-400 bg-purple-500/10 border-purple-500/20' : 'text-purple-600 bg-purple-50 border-purple-100';
-            default: return 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700';
-        }
-    };
 
     const visibleFeedTypes = useMemo(() => {
         const list = [];
@@ -749,6 +611,29 @@ function AppInternal() {
         }
     }, [actionTargetId, activeTab]);
 
+    const handleSelectDay = (dayId, autoScroll = true) => {
+        setSelectedDayId(dayId);
+        if (autoScroll && timelineScrollRef.current) {
+            const dayIndex = trendsChartData.findIndex(d => d.id === dayId);
+            if (dayIndex !== -1) {
+                isAutoScrollingRef.current = true;
+                timelineScrollRef.current.scrollTo({
+                    left: dayIndex * 960,
+                    behavior: 'smooth'
+                });
+                setTimeout(() => isAutoScrollingRef.current = false, 1000);
+            }
+        }
+    };
+
+    const handleNavigateDay = (direction) => {
+        const currentIndex = trendsChartData.findIndex(d => d.id === selectedDayId);
+        const newIndex = currentIndex + direction;
+        if (newIndex >= 0 && newIndex < trendsChartData.length) {
+            handleSelectDay(trendsChartData[newIndex].id);
+        }
+    };
+
     if (loading) {
         return (
             <div className={`h-screen flex items-center justify-center text-indigo-500 animate-pulse ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
@@ -774,33 +659,14 @@ function AppInternal() {
                 </div>
             )}
 
-            <header className={`px-4 py-3 sticky top-0 z-30 transition-colors ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-100'} backdrop-blur-md border-b flex justify-between items-center`}>
-                <div className="flex items-center gap-2">
-                    {activeTab !== 'log' ? (
-                        <button onClick={() => setActiveTab('log')} className="p-2 text-indigo-500 active:scale-95 transition-transform">
-                            <ArrowLeft size={20} />
-                        </button>
-                    ) : (
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'online' ? 'bg-emerald-500 shadow-emerald-500/20 shadow-lg' : 'bg-red-400'}`} />
-                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Database</span>
-                        </div>
-                    )}
-                </div>
-                <div className="flex items-center gap-2">
-                    {activeTab === 'log' && (
-                        editingId ? (
-                            <button onClick={() => resetForm()} className="bg-rose-500 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase active:scale-95">Annuleren</button>
-                        ) : (
-                            <>
-                                <button onClick={() => setActiveTab('trends')} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700 text-indigo-400' : 'bg-white border-slate-100 text-indigo-600'} active:scale-90`}><BarChart3 size={20} /></button>
-                                <button onClick={() => setActiveTab('settings')} className={`p-2.5 rounded-full shadow-sm border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-100 text-slate-500'} active:scale-90`}><Settings size={20} /></button>
-                            </>
-                        )
-                    )}
-                    {activeTab !== 'log' && <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDarkMode ? 'text-slate-300' : 'text-slate-400'}`}>{activeTab === 'trends' ? 'Tijdlijn' : 'Opties'}</span>}
-                </div>
-            </header>
+            <Header
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                dbStatus={dbStatus}
+                editingId={editingId}
+                resetForm={resetForm}
+                isDarkMode={isDarkMode}
+            />
 
             {toast && (
                 <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-full duration-500">
@@ -824,450 +690,82 @@ function AppInternal() {
                             </section>
                         )}
 
-                        <section className={`p-5 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} ${editingId ? 'border-indigo-400 shadow-xl' : ''}`}>
-                            <div className="flex items-center gap-2 mb-6 px-1 text-slate-700">
-                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-indigo-500 ${isDarkMode ? 'bg-slate-800' : 'bg-indigo-50'}`}><Clock size={18} /></div>
-                                <div className="flex flex-col">
-                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-300' : 'text-slate-500'}`}>Laatste voeding</span>
-                                    <span className={`text-sm font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-700'}`}>{lastFeedingLabel} geleden</span>
-                                </div>
-                            </div>
+                        <LogForm
+                            editingId={editingId}
+                            isDarkMode={isDarkMode}
+                            lastFeedingLabel={lastFeedingLabel}
+                            handleSave={handleSave}
+                            isSubmitting={isSubmitting}
+                            isFormValid={isFormValid}
+                            feedType={feedType}
+                            setFeedType={setFeedType}
+                            handleFeedTypeToggle={handleFeedTypeToggle}
+                            visibleFeedTypes={visibleFeedTypes}
+                            timestamp={timestamp}
+                            setTimestamp={setTimestamp}
+                            adjustTime={adjustTime}
+                            firstBreast={firstBreast}
+                            setFirstBreast={setFirstBreast}
+                            amountLeft={amountLeft}
+                            setAmountLeft={setAmountLeft}
+                            amountRight={amountRight}
+                            setAmountRight={setAmountRight}
+                            amount={amount}
+                            setAmount={setAmount}
+                            hasPlas={hasPlas}
+                            setHasPlas={setHasPlas}
+                            hasPoep={hasPoep}
+                            setHasPoep={setHasPoep}
+                            hasVitamins={hasVitamins}
+                            setHasVitamins={setHasVitamins}
+                            vitamins={vitamins}
+                            setVitamins={setVitamins}
+                        />
 
-                            <form onSubmit={handleSave} className="space-y-6">
-                                <div className="space-y-2">
-                                    <div className={`relative group overflow-hidden rounded-2xl border p-4 shadow-inner ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                                        <label className={`absolute top-2 left-4 text-[9px] font-black uppercase tracking-[0.2em] ${isDarkMode ? 'text-slate-200' : 'text-slate-400'}`}>Datum & Tijd</label>
-                                        <div className="flex items-center justify-between pt-3 text-slate-800 dark:text-white">
-                                            <span className="text-sm font-black uppercase">{formatDateTimeFull(timestamp)}</span>
-                                            <Calendar size={18} className="text-indigo-500" />
-                                        </div>
-                                        <input type="datetime-local" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
-                                    </div>
-
-                                    <div className="grid grid-cols-4 gap-1.5 px-0.5">
-                                        {[
-                                            { label: '-1u', val: -60 }, { label: '-10m', val: -10 }, { label: '-5m', val: -5 }, { label: '-1m', val: -1 },
-                                            { label: '+1u', val: 60 }, { label: '+10m', val: 10 }, { label: '+5m', val: 5 }, { label: '+1m', val: 1 }
-                                        ].map((btn, idx) => (
-                                            <button key={idx} type="button" onClick={() => adjustTime(btn.val)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border transition-all active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-indigo-400' : 'bg-slate-50 border-slate-200 text-indigo-600'}`}>{btn.label}</button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className={`grid gap-2 ${visibleFeedTypes.length === 1 ? 'grid-cols-1' : visibleFeedTypes.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                                    {visibleFeedTypes.map(type => (
-                                        <button key={type.id} type="button" onClick={() => handleFeedTypeToggle(type.id)} className={`py-3.5 rounded-xl font-black text-[10px] uppercase border flex flex-col items-center justify-center gap-1 transition-all ${feedType === type.id ? `${type.activeColor} text-white border-transparent shadow-md` : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-50 border-transparent text-slate-500')}`}>
-                                            {type.icon}
-                                            {type.label}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                {feedType && (
-                                    <div className="space-y-4 animate-in slide-in-from-top-2 overflow-hidden">
-                                        {feedType === 'Borst' ? (
-                                            <div className="space-y-4">
-                                                <div className="flex flex-col gap-2">
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest px-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-50'}`}>Startkant</span>
-                                                    <div className="flex gap-2">
-                                                        {['Links', 'Rechts'].map(side => (
-                                                            <button key={side} type="button" onClick={() => setFirstBreast(side)} className={`flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase border flex items-center justify-center gap-2 transition-all ${firstBreast === side ? 'bg-pink-500 text-white border-transparent shadow-md' : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500')}`}>
-                                                                {firstBreast === side && <Heart size={12} fill="currentColor" />} {side} eerst
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {[{ l: 'Links', v: amountLeft, s: setAmountLeft, side: 'Links' }, { l: 'Rechts', v: amountRight, s: setAmountRight, side: 'Rechts' }].map(b => (
-                                                        <div key={b.side} className="space-y-1.5 min-w-0">
-                                                            <div className="flex justify-between items-center px-1">
-                                                                <label className={`text-[10px] font-bold uppercase flex items-center gap-1 ${isDarkMode ? 'text-slate-300' : 'text-slate-400'}`}>{b.l}</label>
-                                                                <span className="text-[9px] font-black uppercase text-pink-500">Minuten</span>
-                                                            </div>
-                                                            <div className={`flex items-center justify-between p-1.5 rounded-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                                                                <button type="button" onClick={() => b.s(v => Math.max(0, Number(v) - 5))} className="w-10 h-10 flex items-center justify-center rounded-lg bg-white dark:bg-slate-700 shadow-sm active:scale-90 transition-transform">
-                                                                    <Minus size={14} />
-                                                                </button>
-                                                                <input type="number" value={b.v} onChange={(e) => b.s(e.target.value)} className="w-full text-center font-black text-xl bg-transparent border-0 focus:ring-0 p-0" />
-                                                                <button type="button" onClick={() => b.s(v => Number(v) + 5)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-white dark:bg-slate-700 shadow-sm active:scale-90 transition-transform">
-                                                                    <Plus size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2 w-full">
-                                                <div className="flex justify-between px-1">
-                                                    <span className="text-[10px] font-bold uppercase text-slate-400">Hoeveelheid</span>
-                                                    <span className="text-[10px] font-bold uppercase text-slate-300">{feedType === 'Vast' ? 'Gram' : 'Milliliter'}</span>
-                                                </div>
-                                                <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 overflow-hidden`}>
-                                                    <button type="button" onClick={() => setAmount(v => Math.max(0, Number(v) - 10))} className="w-14 h-14 shrink-0 flex items-center justify-center rounded-xl bg-white dark:bg-slate-700 shadow-sm active:scale-95 transition-transform">
-                                                        <Minus size={22} />
-                                                    </button>
-                                                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="flex-1 text-center font-black text-3xl bg-transparent border-0 focus:ring-0 p-0 dark:text-white min-w-0" />
-                                                    <button type="button" onClick={() => setAmount(v => Number(v) + 10)} className="w-14 h-14 shrink-0 flex items-center justify-center rounded-xl bg-white dark:bg-slate-700 shadow-sm active:scale-95 transition-transform">
-                                                        <Plus size={22} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <button type="button" onClick={() => setHasPlas(!hasPlas)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex items-center justify-center gap-1.5 transition-all ${hasPlas ? 'bg-yellow-400 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-50 border-transparent text-slate-500')}`}>
-                                            <Droplets size={14} /> Plas
-                                        </button>
-                                        <button type="button" onClick={() => setHasPoep(!hasPoep)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex items-center justify-center gap-1.5 transition-all ${hasPoep ? 'bg-amber-900 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-50 border-transparent text-slate-500')}`}>
-                                            <PoopIcon className="w-3.5 h-3.5" /> Poep
-                                        </button>
-                                        <button type="button" onClick={() => setHasVitamins(!hasVitamins)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex items-center justify-center gap-1.5 transition-all ${hasVitamins ? 'bg-purple-600 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-50 border-transparent text-slate-500')}`}>
-                                            <Sparkles size={14} /> Vita
-                                        </button>
-                                    </div>
-                                    {hasVitamins && (
-                                        <div className="flex gap-2 animate-in slide-in-from-top-2 duration-300">
-                                            <button type="button" onClick={() => setVitamins(v => ({ ...v, d: !v.d }))} className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase border ${vitamins.d ? 'bg-purple-500 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-400')}`}>Vitamine D</button>
-                                            <button type="button" onClick={() => setVitamins(v => ({ ...v, k: !v.k }))} className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase border ${vitamins.k ? 'bg-purple-500 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-400')}`}>Vitamine K</button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <button type="submit" disabled={isSubmitting || !isFormValid} className={`w-full py-4.5 rounded-2xl text-white font-black uppercase text-sm shadow-lg active:scale-[0.98] transition-all ${isSubmitting || !isFormValid ? 'bg-slate-300 shadow-none grayscale opacity-50' : (feedType === 'Borst' ? 'bg-pink-500 shadow-pink-500/20' : 'bg-indigo-600 shadow-indigo-600/20')}`}>
-                                    {isSubmitting ? 'Bezig...' : 'Gebeurtenis Loggen'}
-                                </button>
-                            </form>
-                        </section>
-
-                        <div className="space-y-6 mt-8 pb-10">
-                            {groupedLogsList.map(group => (
-                                <div key={group.date} className="space-y-2">
-                                    <div className="flex items-center gap-3 py-2">
-                                        <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800"></div>
-                                        <span className="text-[11px] font-bold uppercase text-slate-500">{getRelativeDateLabel(group.date)}</span>
-                                        <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800"></div>
-                                    </div>
-                                    {group.items.map(log => {
-                                        const isT = highlightedId === log.id;
-                                        const isEditing = editingId === log.id;
-                                        const getBg = () => {
-                                            if (isEditing) return isDarkMode ? 'bg-indigo-900/30 border-indigo-500 ring-2 ring-indigo-500 shadow-lg shadow-indigo-500/20' : 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-400 shadow-md shadow-indigo-500/10';
-                                            if (!isT) return isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100';
-                                            return actionType === 'save' ? (isDarkMode ? 'bg-emerald-900/50 ring-emerald-500 ring-2' : 'bg-emerald-50 ring-emerald-400 ring-2') : (isDarkMode ? 'bg-rose-900/50 ring-rose-500 ring-2' : 'bg-rose-50 ring-rose-400 ring-2');
-                                        };
-
-                                        const icons = [];
-                                        if (log.feedType === 'Borst') icons.push(<Heart size={20} className="text-pink-500" />);
-                                        else if (log.feedType === 'Fles') icons.push(<Milk size={20} className="text-indigo-500" />);
-                                        else if (log.feedType === 'Vast') icons.push(<Utensils size={20} className="text-orange-500" />);
-
-                                        if (log.hasPlas || log.hasPoep) icons.push(<Droplets size={18} className={log.hasPoep ? 'text-amber-700' : 'text-yellow-400'} />);
-                                        if (log.hasVitamins) icons.push(<Sparkles size={18} className="text-purple-500" />);
-                                        if (icons.length === 0) icons.push(<Baby size={20} className="text-slate-400" />);
-
-                                        const intervalObj = typeIntervals[log.id];
-
-                                        return (
-                                            <div key={log.id} id={`log-item-${log.id}`} onClick={() => startEdit(log)} className={`p-4 rounded-[1.8rem] border flex items-center gap-4 transition-all duration-700 cursor-pointer border-slate-100 dark:border-slate-800 ${getBg()}`}>
-                                                <div className={`flex flex-wrap items-center justify-center gap-1 p-3 rounded-2xl w-16 h-16 shrink-0 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                                                    {icons.map((icon, idx) => <div key={idx} className="animate-in zoom-in duration-300">{icon}</div>)}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="text-xs font-black opacity-60">{formatTime(log.timestamp)}</span>
-                                                        <div className="flex items-center gap-3">
-                                                            {intervalObj && (
-                                                                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${getIntervalStyle(intervalObj.category, isDarkMode)}`}>
-                                                                    <Clock size={10} />
-                                                                    <span className="text-[10px] font-black">+{intervalObj.text}</span>
-                                                                </div>
-                                                            )}
-                                                            <button onClick={(e) => { e.stopPropagation(); setItemToDelete(log.id); }} className="text-slate-300 hover:text-red-500 transition-colors">
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <h3 className="font-black text-sm">
-                                                        {log.feedType === 'Borst' ? `L: ${log.amountLeft}m | R: ${log.amountRight}m` : log.feedType ? `${log.amount}${log.feedType === 'Vast' ? 'g' : 'ml'} ${log.feedType}` : 'Gebeurtenis'}
-                                                    </h3>
-                                                    <div className="flex flex-wrap gap-2 mt-1">
-                                                        {log.feedType === 'Borst' && log.firstBreast && <div className="text-[9px] font-black uppercase text-pink-600 bg-pink-500/10 px-1.5 py-0.5 rounded-md">Start: {log.firstBreast}</div>}
-                                                        {log.hasPlas && <div className="text-[9px] font-black uppercase text-yellow-600">Plas</div>}
-                                                        {log.hasPoep && <div className="text-[9px] font-black uppercase text-amber-900">Poep</div>}
-                                                        {log.hasVitamins && <div className="text-[9px] font-black uppercase text-purple-600">Vita: {log.vitamins?.d ? 'D' : ''}{log.vitamins?.k ? '+K' : ''}</div>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ))}
-                        </div>
+                        <LogList
+                            groupedLogsList={groupedLogsList}
+                            highlightedId={highlightedId}
+                            editingId={editingId}
+                            actionType={actionType}
+                            startEdit={startEdit}
+                            setItemToDelete={setItemToDelete}
+                            isDarkMode={isDarkMode}
+                            typeIntervals={typeIntervals}
+                        />
                     </>
                 ) : activeTab === 'trends' ? (
-                    <div className="space-y-6 animate-in fade-in duration-300 pb-12">
-                        <div className={`p-5 rounded-[2rem] border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <h3 className="text-xs font-black uppercase mb-4 opacity-50 tracking-widest">Weekoverzicht (Gemiddeld per dag)</h3>
-                            <div className="grid grid-cols-2 gap-2 mb-6">
-                                {Number(weeklyAvgs.totalVoedingen) > 0 && (
-                                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-slate-800 dark:text-white">
-                                        <div className="flex items-center gap-2 text-emerald-500 mb-1">
-                                            <Clock size={14} /><span className="text-[10px] font-black uppercase">Totaal Voedingen</span>
-                                        </div>
-                                        <p className="text-lg font-black">{weeklyAvgs.totalVoedingen}x</p>
-                                    </div>
-                                )}
-                                {Number(weeklyAvgs.flesCount) > 0 && (
-                                    <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl text-slate-800 dark:text-white">
-                                        <div className="flex items-center gap-2 text-indigo-500 mb-1">
-                                            <Milk size={14} /><span className="text-[10px] font-black uppercase">Fles</span>
-                                        </div>
-                                        <p className="text-lg font-black">{weeklyAvgs.flesCount}x <span className="text-[10px] font-bold opacity-50">({weeklyAvgs.flesAmount}ml)</span></p>
-                                    </div>
-                                )}
-                                {Number(weeklyAvgs.borstCount) > 0 && (
-                                    <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded-2xl text-slate-800 dark:text-white">
-                                        <div className="flex items-center gap-2 text-pink-500 mb-1">
-                                            <Heart size={14} /><span className="text-[10px] font-black uppercase">Borst ({weeklyAvgs.borstCount}x)</span>
-                                        </div>
-                                        <p className="text-xs font-black truncate mt-1">L:{weeklyAvgs.borstL}m | R:{weeklyAvgs.borstR}m</p>
-                                    </div>
-                                )}
-                                {Number(weeklyAvgs.vastCount) > 0 && (
-                                    <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-2xl text-slate-800 dark:text-white">
-                                        <div className="flex items-center gap-2 text-orange-500 mb-1">
-                                            <Utensils size={14} /><span className="text-[10px] font-black uppercase">Vast</span>
-                                        </div>
-                                        <p className="text-lg font-black">{weeklyAvgs.vastCount}x <span className="text-[10px] font-bold opacity-50">({weeklyAvgs.vastAmount}g)</span></p>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex items-end justify-between h-32 gap-2 border-t pt-4 border-slate-100 dark:border-slate-800 px-1">
-                                {trendsChartData.map(day => {
-                                    const max = Math.max(...trendsChartData.map(d => d.ml), 500);
-                                    const isSelected = selectedDayId === day.id;
-                                    const hasData = day.items.length > 0;
-                                    const hPct = hasData ? Math.max(12, (day.ml/max)*100) : 0;
-                                    return (
-                                        <div key={day.id} onClick={() => handleSelectDay(day.id)} className="flex-1 flex flex-col items-center gap-2 cursor-pointer group">
-                                            <div className="w-full flex justify-center items-end h-20">
-                                                <div style={{ height: `${hPct}%` }} className={`w-3 sm:w-4 rounded-full transition-all duration-300 ${isSelected ? 'bg-indigo-600 shadow-lg' : (hasData ? (day.hasBreastfeeding ? 'bg-pink-400 dark:bg-pink-500/50' : 'bg-indigo-300 dark:bg-slate-700') : 'bg-slate-50 dark:bg-slate-900 opacity-20')}`} />
-                                            </div>
-                                            <span className={`text-[9px] font-black uppercase ${isSelected ? 'text-indigo-600' : 'opacity-40'}`}>{day.label}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {selectedDayId && (
-                            <div className={`p-5 rounded-[2rem] border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} overflow-hidden`}>
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="text-[10px] font-black uppercase opacity-50 tracking-widest">Dagtijdlijn</h4>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleNavigateDay(-1)} className="p-1 active:scale-90 transition-transform"><ChevronLeft size={18} /></button>
-                                        <button onClick={() => handleNavigateDay(1)} className="p-1 active:scale-90 transition-transform"><ChevronRight size={18} /></button>
-                                    </div>
-                                </div>
-
-                                {selectedDayStats && (
-                                    <div className="flex gap-2 mb-4 overflow-x-auto custom-scrollbar pb-2">
-                                        <div className={`shrink-0 p-3 rounded-2xl flex flex-col justify-center min-w-[5rem] ${isDarkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-50 text-slate-700'}`}>
-                                            <div className="flex items-center gap-1.5 mb-1 opacity-50"><Droplets size={12}/><span className="text-[9px] font-black uppercase">Luiers</span></div>
-                                            <div className="text-xs font-black">{selectedDayStats.plas}x <span className="opacity-40 font-normal">/</span> {selectedDayStats.poep}x💩</div>
-                                        </div>
-                                        {selectedDayStats.fles.count > 0 && (
-                                            <div className={`shrink-0 p-3 rounded-2xl flex flex-col justify-center min-w-[6rem] ${isDarkMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                                                <div className="flex items-center gap-1.5 mb-1 opacity-80"><Milk size={12}/><span className="text-[9px] font-black uppercase">Fles ({selectedDayStats.fles.count}x)</span></div>
-                                                <div className="text-xs font-black">{selectedDayStats.fles.total}ml <span className="opacity-60 font-bold text-[9px]">~{selectedDayStats.fles.avg}/k</span></div>
-                                            </div>
-                                        )}
-                                        {selectedDayStats.borst.count > 0 && (
-                                            <div className={`shrink-0 p-3 rounded-2xl flex flex-col justify-center min-w-[7rem] ${isDarkMode ? 'bg-pink-500/10 text-pink-400' : 'bg-pink-50 text-pink-600'}`}>
-                                                <div className="flex items-center gap-1.5 mb-1 opacity-80"><Heart size={12}/><span className="text-[9px] font-black uppercase">Borst ({selectedDayStats.borst.count}x)</span></div>
-                                                <div className="text-xs font-black">L:{selectedDayStats.borst.totL}m R:{selectedDayStats.borst.totR}m</div>
-                                                <div className="text-[9px] font-bold opacity-60">~ L:{selectedDayStats.borst.avgL}m R:{selectedDayStats.borst.avgR}m</div>
-                                            </div>
-                                        )}
-                                        {selectedDayStats.vast.count > 0 && (
-                                            <div className={`shrink-0 p-3 rounded-2xl flex flex-col justify-center min-w-[6rem] ${isDarkMode ? 'bg-orange-500/10 text-orange-400' : 'bg-orange-50 text-orange-600'}`}>
-                                                <div className="flex items-center gap-1.5 mb-1 opacity-80"><Utensils size={12}/><span className="text-[9px] font-black uppercase">Vast ({selectedDayStats.vast.count}x)</span></div>
-                                                <div className="text-xs font-black">{selectedDayStats.vast.total}g <span className="opacity-60 font-bold text-[9px]">~{selectedDayStats.vast.avg}/k</span></div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="overflow-x-auto overflow-y-hidden custom-scrollbar h-[220px]" ref={timelineScrollRef} onScroll={handleTimelineScroll} style={{ touchAction: 'pan-x' }}>
-                                    <div className="flex relative h-full" style={{ width: `${trendsChartData.length * 960}px` }}>
-                                        {trendsChartData.map((day, idx) => {
-                                            const bgClass = day.id === selectedDayId
-                                                ? (isDarkMode ? 'bg-slate-800/80' : 'bg-indigo-50/80')
-                                                : (idx % 2 === 0 ? (isDarkMode ? 'bg-slate-900' : 'bg-slate-200/60') : (isDarkMode ? 'bg-slate-950' : 'bg-slate-50'));
-
-                                            return (
-                                                <div key={day.id} className={`relative w-[960px] h-full transition-colors ${bgClass}`}>
-                                                    <div className={`sticky top-0 left-0 inline-block px-4 py-2 font-black text-[10px] text-indigo-500 uppercase tracking-widest z-20 backdrop-blur-md rounded-br-xl ${isDarkMode ? 'bg-slate-900/80' : 'bg-white/80'}`}>
-                                                        {getRelativeDateLabel(day.id)}
-                                                    </div>
-
-                                                    {[...Array(25)].map((_, h) => (
-                                                        <div key={h} className="absolute top-0 h-full border-l border-slate-100 dark:border-slate-800 flex flex-col justify-end pb-8" style={{ left: `${(h/24)*100}%` }}>
-                                                            {h % 6 === 0 && <span className="text-[9px] font-black opacity-30 -translate-x-1/2">{h}:00</span>}
-                                                        </div>
-                                                    ))}
-
-                                                    {day.items.filter(f => (Number(f.amount) || Number(f.amountLeft) + Number(f.amountRight) > 0)).map(f => {
-                                                        const date = toSafeDate(f.timestamp);
-                                                        const pos = ((date.getHours() * 60 + date.getMinutes()) / 1440) * 100;
-                                                        const isB = f.feedType === 'Borst';
-                                                        const amt = Number(f.amount) || (Number(f.amountLeft || 0) + Number(f.amountRight || 0)) || 0;
-                                                        const col = f.feedType === 'Vast' ? 'bg-orange-600' : (isB ? 'bg-pink-500' : 'bg-indigo-600');
-                                                        const interval = feedingIntervalsMap[f.id];
-
-                                                        if (isB) {
-                                                            const barW = Math.max(1.5, (amt / 1440) * 100);
-                                                            return (
-                                                                <div key={f.id} onDoubleClick={() => { setActiveTab('log'); startEdit(f); }} className="absolute z-10 flex flex-col items-center cursor-pointer group" style={{ left: `${pos}%`, bottom: '2.5rem', width: `${barW}%` }}>
-                                                                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center z-50">
-                                                                        {interval && <span className={`text-[6px] font-black mb-0.5 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>+{interval}</span>}
-                                                                        <div className="bg-pink-600 text-white text-[8px] font-black px-1 rounded whitespace-nowrap shadow-sm">{amt}m</div>
-                                                                    </div>
-                                                                    <div className={`h-2.5 w-full rounded-full ${col} shadow-sm border border-white/20`} />
-                                                                    <span className="text-[7px] font-black mt-1 opacity-50 whitespace-nowrap">{formatTime(f.timestamp)}</span>
-                                                                </div>
-                                                            );
-                                                        } else {
-                                                            const barH = Math.min(50, (amt/160)*50);
-                                                            return (
-                                                                <div key={f.id} onDoubleClick={() => { setActiveTab('log'); startEdit(f); }} className="absolute z-10 flex flex-col items-center cursor-pointer" style={{ left: `${pos}%`, bottom: '2.5rem', width: '40px', transform: 'translateX(-50%)' }}>
-                                                                    <div className="flex flex-col items-center mb-1">
-                                                                        {interval && <span className={`text-[6px] font-black mb-0.5 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>+{interval}</span>}
-                                                                        <div className={`px-1.5 py-0.5 rounded-md text-white font-black text-[8px] shadow-sm ${col}`}>{amt}{f.feedType === 'Vast' ? 'g' : 'ml'}</div>
-                                                                    </div>
-                                                                    <div className={`w-2.5 rounded-full ${col} shadow-sm`} style={{ height: `${barH}px` }} />
-                                                                    <span className="text-[7px] font-black mt-1 opacity-50">{formatTime(f.timestamp)}</span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                    })}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <TrendsTab
+                        weeklyAvgs={weeklyAvgs}
+                        trendsChartData={trendsChartData}
+                        selectedDayId={selectedDayId}
+                        handleSelectDay={handleSelectDay}
+                        handleNavigateDay={handleNavigateDay}
+                        selectedDayStats={selectedDayStats}
+                        isDarkMode={isDarkMode}
+                        feedingIntervalsMap={feedingIntervalsMap}
+                        setActiveTab={setActiveTab}
+                        startEdit={startEdit}
+                    />
                 ) : (
-                    <div className="space-y-6 animate-in slide-in-from-right-3 duration-300 pb-12 text-slate-800 dark:text-slate-100">
-                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-2">
-                                <Moon size={20} className="text-indigo-500" />
-                                <h3 className="font-black uppercase text-sm tracking-tight">Weergave</h3>
-                            </div>
-                            <button onClick={toggleDarkMode} className={`w-full p-4 rounded-2xl flex items-center justify-between border active:scale-95 transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100 text-slate-800'}`}>
-                                <div className="flex items-center gap-3">{isDarkMode ? <Sun className="text-amber-400" /> : <Moon />} <span>{isDarkMode ? 'Lichte Modus' : 'Donkere Modus'}</span></div>
-                                <div className={`w-12 h-6 rounded-full relative transition-colors ${isDarkMode ? 'bg-indigo-600' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isDarkMode ? 'left-7' : 'left-1'}`} /></div>
-                            </button>
-                        </section>
-
-                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <Eye size={20} className="text-indigo-600" />
-                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Zichtbaarheid</h3>
-                            </div>
-                            <div className="space-y-2">
-                                {['Fles', 'Borst', 'Vast'].map(key => (
-                                    <div key={key} className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-slate-800">
-                                        <span className="text-[11px] font-black uppercase opacity-60">{key}</span>
-                                        <button onClick={() => toggleVisibility(key)} className={`w-10 h-5 rounded-full relative transition-all ${visibilitySettings[key] ? 'bg-indigo-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${visibilitySettings[key] ? 'left-5.5' : 'left-0.5'}`} /></button>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <ShieldCheck size={20} className="text-purple-600" />
-                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Doelen</h3>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-slate-800">
-                                    <span className="text-[11px] font-black uppercase opacity-60">Vitamine D</span>
-                                    <button onClick={() => toggleRequirement('d')} className={`w-10 h-5 rounded-full relative ${vitRequirements.d ? 'bg-purple-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${vitRequirements.d ? 'left-5.5' : 'left-0.5'}`} /></button>
-                                </div>
-                                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-slate-800">
-                                    <span className="text-[11px] font-black uppercase opacity-60">Vitamine K</span>
-                                    <button onClick={() => toggleRequirement('k')} className={`w-10 h-5 rounded-full relative ${vitRequirements.k ? 'bg-purple-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${vitRequirements.k ? 'left-5.5' : 'left-0.5'}`} /></button>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <Users size={20} className="text-cyan-500" />
-                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Account Members</h3>
-                            </div>
-                            {isOwner && (
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={newMemberUid}
-                                        onChange={(e) => setNewMemberUid(e.target.value)}
-                                        placeholder="Enter new member's UID"
-                                        className="flex-grow p-2 rounded-lg text-xs bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                                    />
-                                    <button onClick={handleAddMember} disabled={isSubmitting} className="p-2 bg-cyan-600 text-white rounded-lg active:scale-95 transition-transform disabled:opacity-50">
-                                        <Plus size={16} />
-                                    </button>
-                                </div>
-                            )}
-                            <div className="space-y-2">
-                                {Object.entries(account.members).map(([uid, role]) => (
-                                    <div key={uid} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-                                        <span className="text-xs font-mono truncate opacity-70">{uid}</span>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${role === 'owner' ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>{role}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <Database size={20} className="text-emerald-500" />
-                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Gegevens</h3>
-                            </div>
-                            <div className="grid gap-2 text-indigo-600 dark:text-indigo-400">
-                                <button onClick={handleExport} className="p-4 rounded-xl border border-slate-50 dark:border-slate-800 flex items-center justify-between active:scale-95 transition-all text-indigo-600 dark:text-indigo-400">
-                                    <div className="flex items-center gap-3"><Download size={18} /><span className="text-xs font-black uppercase tracking-widest">Backup maken</span></div>
-                                    <ArrowRight size={14} />
-                                </button>
-                                <button onClick={() => fileInputRef.current?.click()} className="p-4 rounded-xl border border-slate-50 dark:border-slate-800 flex items-center justify-between active:scale-95 transition-all text-emerald-600 dark:text-emerald-400">
-                                    <div className="flex items-center gap-3"><Upload size={18} /><span className="text-xs font-black uppercase tracking-widest">Importeer backup</span></div>
-                                    <ArrowRight size={14} />
-                                </button>
-                            </div>
-                        </section>
-
-                        <section className={`p-6 rounded-[2rem] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <LogOut size={20} className="text-red-500" />
-                                <h3 className="font-black uppercase text-sm tracking-tight text-slate-700 dark:text-white">Account</h3>
-                            </div>
-                            <button onClick={handleSignOut} className="p-4 rounded-xl border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-between w-full active:scale-95 transition-all">
-                                <div className="flex items-center gap-3"><span className="text-xs font-black uppercase tracking-widest">Uitloggen</span></div>
-                                <ArrowRight size={14} />
-                            </button>
-                        </section>
-
-                        <section className="text-center opacity-30 mt-6"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">v{APP_VERSION}</p></section>
-                        <input type="file" ref={fileInputRef} onChange={handleImport} accept=".json" className="hidden" />
-                    </div>
+                    <SettingsTab
+                        isDarkMode={isDarkMode}
+                        toggleDarkMode={toggleDarkMode}
+                        visibilitySettings={visibilitySettings}
+                        toggleVisibility={toggleVisibility}
+                        vitRequirements={vitRequirements}
+                        toggleRequirement={toggleRequirement}
+                        handleExport={handleExport}
+                        fileInputRef={fileInputRef}
+                        handleImport={handleImport}
+                        isOwner={isOwner}
+                        newMemberUid={newMemberUid}
+                        setNewMemberUid={setNewMemberUid}
+                        handleAddMember={handleAddMember}
+                        isSubmitting={isSubmitting}
+                        account={account}
+                        handleSignOut={handleSignOut}
+                        APP_VERSION={APP_VERSION}
+                    />
                 )}
             </main>
 

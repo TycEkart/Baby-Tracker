@@ -3,23 +3,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // user_profiles maps a user's UID to the account they belong to.
-    match /user_profiles/{userId} {
-      // A user can read their own profile to find their accountId.
-      allow read: if request.auth.uid == userId;
-
-      // A user can create their own profile, OR an account owner can create one for a new member.
-      allow create: if request.auth != null && (
-        request.auth.uid == userId ||
-        (request.resource.data.accountId != null &&
-         get(/databases/$(database)/documents/accounts/$(request.resource.data.accountId)).data.owner == request.auth.uid)
-      );
-    }
-
     // accounts hold the shared data and member lists.
     match /accounts/{accountId} {
-      // Any member of the account can read the account document itself (to see members, etc.).
-      allow read: if request.auth != null && get(/databases/$(database)/documents/accounts/$(accountId)).data.members[request.auth.uid] != null;
+      // Allow read access to an account if the user's UID is in the members list.
+      // We also allow querying the collection to find which account a user belongs to.
+      allow read, list: if request.auth != null && resource.data.members[request.auth.uid] != null;
 
       // Only the owner can update the account document (e.g., to add new members).
       allow update: if request.auth != null && request.auth.uid == resource.data.owner;
@@ -27,9 +15,9 @@ service cloud.firestore {
       // A user can create an account only if they set themselves as the owner and sole member.
       // This is a critical rule for the first user.
       allow create: if request.auth != null
-                    && request.auth.uid == resource.data.owner
-                    && resource.data.members.size() == 1
-                    && resource.data.members[request.auth.uid] == 'owner';
+                    && request.auth.uid == request.resource.data.owner
+                    && request.resource.data.members.size() == 1
+                    && request.resource.data.members[request.auth.uid] == 'owner';
 
       // Any member of an account can read, write, and delete baby logs within that account.
       match /baby_logs/{logId} {
