@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import {
-    Moon, Sun, Eye, ShieldCheck, Database, Download, Upload, ArrowRight, Users, Plus, LogOut
+    Moon, Sun, Eye, ShieldCheck, Database, Download, Upload, ArrowRight, Users, Plus, LogOut, Bath
 } from 'lucide-react';
 
 export function SettingsTab({
@@ -15,6 +15,8 @@ export function SettingsTab({
     toggleVisibility,
     vitRequirements,
     toggleRequirement,
+    bathGoal,
+    onBathGoalChange,
     handleExport,
     fileInputRef,
     handleImport,
@@ -68,6 +70,24 @@ export function SettingsTab({
                     <div className={`flex items-center justify-between p-3 rounded-xl border ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
                         <span className="text-[11px] font-black uppercase opacity-60">Vitamine K</span>
                         <button onClick={() => toggleRequirement('k')} className={`w-10 h-5 rounded-full relative ${vitRequirements.k ? 'bg-purple-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${vitRequirements.k ? 'left-5.5' : 'left-0.5'}`} /></button>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-black uppercase opacity-60 flex items-center gap-2"><Bath size={14} />Bad</span>
+                            <button onClick={() => onBathGoalChange({ ...bathGoal, enabled: !bathGoal.enabled })} className={`w-10 h-5 rounded-full relative ${bathGoal.enabled ? 'bg-sky-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${bathGoal.enabled ? 'left-5.5' : 'left-0.5'}`} /></button>
+                        </div>
+                        {bathGoal.enabled && (
+                            <div className="mt-4 flex items-center gap-2">
+                                <span className="text-xs opacity-60">Elke</span>
+                                <input
+                                    type="number"
+                                    value={bathGoal.intervalDays}
+                                    onChange={(e) => onBathGoalChange({ ...bathGoal, intervalDays: Number(e.target.value) })}
+                                    className={`w-16 text-center rounded-lg p-1 text-sm ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}
+                                />
+                                <span className="text-xs opacity-60">dagen</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </section>

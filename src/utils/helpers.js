@@ -54,6 +54,19 @@ export const formatDuration = (mins) => {
     return h > 0 ? `${h}u ${m}m` : `${m}m`;
 };
 
+export const formatDurationInDays = (start, end) => {
+    const startDate = toSafeDate(start);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = toSafeDate(end);
+    endDate.setHours(0, 0, 0, 0);
+
+    const diffTime = Math.abs(endDate - startDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return `${diffDays}d`;
+};
+
+
 export const getLocalDateTimeString = (date = new Date()) => {
     const d = toSafeDate(date);
     const tzoffset = d.getTimezoneOffset() * 60000;
@@ -68,6 +81,7 @@ export const getIntervalStyle = (cat, isDark) => {
         case 'poep': return isDark ? 'text-amber-200 bg-amber-500/10 border-amber-500/20' : 'text-amber-700 bg-amber-50 border-amber-100';
         case 'plas': return isDark ? 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20' : 'text-yellow-600 bg-yellow-50 border-yellow-100';
         case 'vitamins': return isDark ? 'text-purple-200 bg-purple-500/10 border-purple-500/20' : 'text-purple-600 bg-purple-50 border-purple-100';
+        case 'bath': return isDark ? 'text-sky-300 bg-sky-500/10 border-sky-500/20' : 'text-sky-600 bg-sky-50 border-sky-100';
         default: return 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700';
     }
 };

@@ -3,11 +3,11 @@
  * It's a complex component with its own state for managing form inputs.
  * It receives many props from the main App component to handle state changes and submissions.
  */
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-    Clock, Milk, Baby, Utensils, Heart, Plus, Minus, Droplets, Sparkles, Calendar
+    Clock, Milk, Baby, Utensils, Heart, Plus, Minus, Droplets, Sparkles, Calendar, RefreshCw, Bath
 } from 'lucide-react';
-import { formatDateTimeFull } from '../utils/helpers';
+import { formatDateTimeFull, getDiffMinutes, toLocalDateString, toSafeDate, getLocalDateTimeString } from '../utils/helpers';
 import { PoopIcon } from './PoopIcon';
 
 export function LogForm({
@@ -37,12 +37,13 @@ export function LogForm({
     setHasPlas,
     hasPoep,
     setHasPoep,
-    hasVitamins,
-    setHasVitamins,
     vitamins,
-    setVitamins
+    setVitamins,
+    hasBath,
+    setHasBath
 }) {
     const dateTimeInputRef = useRef(null);
+    const [showOther, setShowOther] = useState(false);
 
     const getButtonStyles = () => {
         if (editingId) {
@@ -55,7 +56,8 @@ export function LogForm({
         if (feedType === 'Vast') colors.push('#f97316', '#f59e0b');
         if (hasPlas) colors.push('#eab308');
         if (hasPoep) colors.push('#78350f');
-        if (hasVitamins) colors.push('#9333ea');
+        if (vitamins.d || vitamins.k) colors.push('#9333ea');
+        if (hasBath) colors.push('#0ea5e9');
 
         if (colors.length === 0) {
             return { background: 'linear-gradient(to bottom right, #6366f1, #8b5cf6)', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.2), 0 4px 6px -2px rgba(139, 92, 246, 0.1)' };
@@ -64,6 +66,22 @@ export function LogForm({
             return { background: `linear-gradient(to bottom right, ${colors[0]}, ${colors[0]})` };
         }
         return { background: `linear-gradient(to bottom right, ${colors.join(', ')})` };
+    };
+
+    const getTimestampWarningClass = () => {
+        const now = new Date();
+        const selectedDate = toSafeDate(timestamp);
+
+        const diffMins = Math.abs(getDiffMinutes(now, selectedDate));
+        const isDifferentDay = toLocalDateString(now) !== toLocalDateString(selectedDate);
+
+        if (isDifferentDay) {
+            return isDarkMode ? 'text-red-400' : 'text-red-600';
+        }
+        if (diffMins > 15) {
+            return isDarkMode ? 'text-amber-400' : 'text-amber-600';
+        }
+        return isDarkMode ? 'text-white' : 'text-slate-800';
     };
 
     const [datePart, timePart] = formatDateTimeFull(timestamp).split(', ');
@@ -103,14 +121,19 @@ export function LogForm({
                         ))}
                     </div>
 
-                    <button type="button" onClick={() => dateTimeInputRef.current.showPicker()} className={`w-full text-center relative group overflow-hidden rounded-2xl border p-4 shadow-inner cursor-pointer ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
-                        <div className={`flex flex-col items-center justify-center pointer-events-none ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                            <span className="text-xs font-semibold uppercase opacity-70">{datePart}</span>
-                            <span className="text-3xl font-black">{timePart}</span>
-                        </div>
-                        <Calendar size={18} className="absolute top-3 right-3 text-indigo-500 opacity-50" />
-                    </button>
-                    <input ref={dateTimeInputRef} type="datetime-local" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} className="hidden" />
+                    <div className={`relative group overflow-hidden rounded-2xl border shadow-inner ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                        <button type="button" onClick={() => dateTimeInputRef.current.showPicker()} className="w-full text-center p-4">
+                            <div className={`flex flex-col items-center justify-center pointer-events-none ${getTimestampWarningClass()}`}>
+                                <span className="text-xs font-semibold uppercase opacity-70">{datePart}</span>
+                                <span className="text-3xl font-black">{timePart}</span>
+                            </div>
+                        </button>
+                        <button type="button" onClick={() => setTimestamp(getLocalDateTimeString())} className={`absolute top-3 right-3 p-2 rounded-full active:scale-90 transition-transform ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-200'}`}>
+                            <RefreshCw size={14} className="text-indigo-500 opacity-50" />
+                        </button>
+                        <input ref={dateTimeInputRef} type="datetime-local" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} className="hidden" />
+                    </div>
+
 
                     <div className="grid grid-cols-4 gap-1.5 px-0.5">
                         {[{ label: '-1u', val: -60 }, { label: '-10m', val: -10 }, { label: '-5m', val: -5 }, { label: '-1m', val: -1 }
@@ -191,14 +214,15 @@ export function LogForm({
                         <button type="button" onClick={() => setHasPoep(!hasPoep)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex items-center justify-center gap-1.5 transition-all ${hasPoep ? 'bg-amber-900 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
                             <PoopIcon className="w-3.5 h-3.5" /> Poep
                         </button>
-                        <button type="button" onClick={() => setHasVitamins(!hasVitamins)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex items-center justify-center gap-1.5 transition-all ${hasVitamins ? 'bg-purple-600 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
-                            <Sparkles size={14} /> Vita
+                        <button type="button" onClick={() => setShowOther(!showOther)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex items-center justify-center gap-1.5 transition-all ${(vitamins.d || vitamins.k || hasBath) ? 'bg-purple-600 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
+                            <Sparkles size={14} /> Overige
                         </button>
                     </div>
-                    {hasVitamins && (
+                    {showOther && (
                         <div className="flex gap-2 animate-in slide-in-from-top-2 duration-300">
                             <button type="button" onClick={() => setVitamins(v => ({ ...v, d: !v.d }))} className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase border ${vitamins.d ? 'bg-purple-500 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-400')}`}>Vitamine D</button>
                             <button type="button" onClick={() => setVitamins(v => ({ ...v, k: !v.k }))} className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase border ${vitamins.k ? 'bg-purple-500 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-400')}`}>Vitamine K</button>
+                            <button type="button" onClick={() => setHasBath(!hasBath)} className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase border ${hasBath ? 'bg-sky-500 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-400')}`}>Bad</button>
                         </div>
                     )}
                 </div>

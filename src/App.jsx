@@ -30,10 +30,10 @@ import {
     Tag, Zap, Filter, Utensils, Settings, ShieldCheck, Heart, RefreshCw,
     ArrowLeft, ArrowRight, Moon, Sun, ChevronLeft, ChevronRight, FlaskConical,
     CheckCircle2, FileCode2, ChevronDown, ChevronUp, Eraser, Sparkles, AlertCircle,
-    Eye, EyeOff, Bug, LogOut, Copy, Users
+    Eye, EyeOff, Bug, LogOut, Copy, Users, Bath
 } from 'lucide-react';
 
-import { isEveningTime, toSafeDate, toLocalDateString, formatDuration, getDiffMinutes, getLocalDateTimeString } from './utils/helpers';
+import { isEveningTime, toSafeDate, toLocalDateString, formatDuration, getDiffMinutes, getLocalDateTimeString, formatDurationInDays } from './utils/helpers';
 import { LoginScreen } from './components/LoginScreen';
 import { UnauthorizedScreen } from './components/UnauthorizedScreen';
 import { Header } from './components/Header';
@@ -113,6 +113,7 @@ function AppInternal() {
 
     // Settings
     const [vitRequirements, setVitRequirements] = useState({ d: false, k: false });
+    const [bathGoal, setBathGoal] = useState({ enabled: false, intervalDays: 3 });
     const [visibilitySettings, setVisibilitySettings] = useState({ Fles: true, Borst: true, Vast: true });
 
     // Form states
@@ -124,8 +125,8 @@ function AppInternal() {
     const [firstBreast, setFirstBreast] = useState('Links');
     const [hasPlas, setHasPlas] = useState(false);
     const [hasPoep, setHasPoep] = useState(false);
-    const [hasVitamins, setHasVitamins] = useState(false);
     const [vitamins, setVitamins] = useState({ d: false, k: false });
+    const [hasBath, setHasBath] = useState(false);
     const [timestamp, setTimestamp] = useState(getLocalDateTimeString());
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -136,8 +137,6 @@ function AppInternal() {
     const [selectedDayId, setSelectedDayId] = useState(toLocalDateString(new Date()));
     const [itemToDelete, setItemToDelete] = useState(null);
 
-    const timelineScrollRef = useRef(null);
-    const isAutoScrollingRef = useRef(false);
     const fileInputRef = useRef(null);
 
     // --- BROWSER HISTORY & VISIBILITY INTEGRATION ---
@@ -145,9 +144,18 @@ function AppInternal() {
         const handleHashChange = () => {
             setActiveTab(window.location.hash.substring(1) || 'log');
         };
+
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                setTimestamp(getLocalDateTimeString());
+                const lastHiddenTime = localStorage.getItem('appLastHiddenTime');
+                const now = Date.now();
+                const fiveMinutes = 5 * 60 * 1000;
+
+                if (!lastHiddenTime || (now - parseInt(lastHiddenTime, 10)) > fiveMinutes) {
+                    setTimestamp(getLocalDateTimeString());
+                }
+            } else {
+                localStorage.setItem('appLastHiddenTime', Date.now().toString());
             }
         };
 
@@ -210,7 +218,11 @@ function AppInternal() {
                 amountLeft: feedType === 'Borst' ? parseInt(amountLeft || 0) : 0,
                 amountRight: feedType === 'Borst' ? parseInt(amountRight || 0) : 0,
                 firstBreast: feedType === 'Borst' ? firstBreast : null,
-                hasPlas, hasPoep, hasVitamins, vitamins: hasVitamins ? vitamins : null,
+                hasPlas,
+                hasPoep,
+                hasVitamins: vitamins.d || vitamins.k,
+                vitamins,
+                hasBath,
                 updatedAt: Timestamp.now()
             };
 
@@ -243,8 +255,8 @@ function AppInternal() {
         setTimestamp(getLocalDateTimeString());
         setHasPlas(false);
         setHasPoep(false);
-        setHasVitamins(false);
         setVitamins({ d: false, k: false });
+        setHasBath(false);
 
         if (!keep) {
             setFeedType(null);
@@ -264,8 +276,8 @@ function AppInternal() {
         setFirstBreast(log.firstBreast || 'Links');
         setHasPlas(!!log.hasPlas);
         setHasPoep(!!log.hasPoep);
-        setHasVitamins(!!log.hasVitamins);
         setVitamins(log.vitamins || { d: false, k: false });
+        setHasBath(!!log.hasBath);
         setTimestamp(getLocalDateTimeString(toSafeDate(log.timestamp)));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -308,6 +320,13 @@ function AppInternal() {
         setVitRequirements(newReqs);
         if (user && db && account) {
             await setDoc(doc(db, 'accounts', account.id, 'settings', 'vitamin_requirements'), newReqs, { merge: true });
+        }
+    };
+
+    const handleBathGoalChange = async (newGoal) => {
+        setBathGoal(newGoal);
+        if (user && db && account) {
+            await setDoc(doc(db, 'accounts', account.id, 'settings', 'bath_goal'), newGoal, { merge: true });
         }
     };
 
@@ -389,14 +408,19 @@ function AppInternal() {
                         setAccount({ id: accountId, ...accountDoc.data() });
 
                         // Load user-specific settings
-                        const loadSet = async (path, setter) => {
+                        const loadSet = async (path, setter, defaultValue) => {
                             const snap = await getDoc(doc(db, 'accounts', accountId, 'settings', path));
-                            if (snap.exists()) setter(snap.data());
+                            if (snap.exists()) {
+                                setter(snap.data());
+                            } else if (defaultValue) {
+                                setter(defaultValue);
+                            }
                         };
                         await Promise.all([
                             loadSet('appearance', (d) => setIsDarkMode(!!d.isDarkMode)),
                             loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
-                            loadSet('vitamin_requirements', (d) => setVitRequirements(d))
+                            loadSet('vitamin_requirements', (d) => setVitRequirements(d)),
+                            loadSet('bath_goal', (d) => setBathGoal(g => ({...g, ...d})), { enabled: false, intervalDays: 3 })
                         ]);
                     } else {
                         setAccount(null);
@@ -520,7 +544,7 @@ function AppInternal() {
     const typeIntervals = useMemo(() => {
         const sorted = [...logs].sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
         const result = {};
-        const lastSeen = { feeding: null, poep: null, plas: null, vitamins: null };
+        const lastSeen = { feeding: null, poep: null, plas: null, vitamins: null, bath: null };
 
         sorted.forEach(log => {
             const ts = toSafeDate(log.timestamp);
@@ -534,6 +558,8 @@ function AppInternal() {
                 if (lastSeen.plas) data = { text: formatDuration(getDiffMinutes(lastSeen.plas, ts)), category: 'plas' };
             } else if (log.hasVitamins) {
                 if (lastSeen.vitamins) data = { text: formatDuration(getDiffMinutes(lastSeen.vitamins, ts)), category: 'vitamins' };
+            } else if (log.hasBath) {
+                if (lastSeen.bath) data = { text: formatDurationInDays(lastSeen.bath, ts), category: 'bath' };
             }
 
             result[log.id] = data;
@@ -542,6 +568,7 @@ function AppInternal() {
             if (log.hasPoep) lastSeen.poep = ts;
             if (log.hasPlas) lastSeen.plas = ts;
             if (log.hasVitamins) lastSeen.vitamins = ts;
+            if (log.hasBath) lastSeen.bath = ts;
         });
         return result;
     }, [logs]);
@@ -565,20 +592,38 @@ function AppInternal() {
         const hasFeeding = (feedType === 'Borst')
             ? (parseInt(amountLeft || 0) > 0 || parseInt(amountRight || 0) > 0)
             : (feedType && parseInt(amount || 0) > 0);
-        const hasVita = hasVitamins && (vitamins.d || vitamins.k);
-        return hasFeeding || hasPlas || hasPoep || hasVita;
-    }, [amount, amountLeft, amountRight, feedType, hasPlas, hasPoep, hasVitamins, vitamins]);
+        return hasFeeding || hasPlas || hasPoep || vitamins.d || vitamins.k || hasBath;
+    }, [amount, amountLeft, amountRight, feedType, hasPlas, hasPoep, vitamins, hasBath]);
 
     const missingVitamins = useMemo(() => {
         const todayDs = toLocalDateString(new Date());
         const todayLogs = logs.filter(l => toLocalDateString(l.timestamp) === todayDs);
-        const hasD = todayLogs.some(l => l.hasVitamins && l.vitamins?.d);
-        const hasK = todayLogs.some(l => l.hasVitamins && l.vitamins?.k);
+        const hasD = todayLogs.some(l => l.vitamins?.d);
+        const hasK = todayLogs.some(l => l.vitamins?.k);
         const list = [];
         if (vitRequirements.d && !hasD) list.push("Vitamine D");
         if (vitRequirements.k && !hasK) list.push("Vitamine K");
         return list;
     }, [logs, vitRequirements]);
+
+    const isBathOverdue = useMemo(() => {
+        if (!bathGoal.enabled || logs.length === 0) {
+            return false;
+        }
+        const lastBathLog = logs.find(log => log.hasBath);
+        if (!lastBathLog) {
+            return true; // No bath ever recorded
+        }
+        const lastBathDate = toSafeDate(lastBathLog.timestamp);
+        lastBathDate.setHours(0, 0, 0, 0);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const daysSinceLastBath = (today.getTime() - lastBathDate.getTime()) / (1000 * 60 * 60 * 24);
+
+        return daysSinceLastBath >= bathGoal.intervalDays;
+    }, [logs, bathGoal]);
 
     const trendsChartData = useMemo(() => {
         return [...Array(7)].map((_, i) => {
@@ -680,19 +725,8 @@ function AppInternal() {
         }
     }, [actionTargetId, activeTab]);
 
-    const handleSelectDay = (dayId, autoScroll = true) => {
+    const handleSelectDay = (dayId) => {
         setSelectedDayId(dayId);
-        if (autoScroll && timelineScrollRef.current) {
-            const dayIndex = trendsChartData.findIndex(d => d.id === dayId);
-            if (dayIndex !== -1) {
-                isAutoScrollingRef.current = true;
-                timelineScrollRef.current.scrollTo({
-                    left: dayIndex * 960,
-                    behavior: 'smooth'
-                });
-                setTimeout(() => isAutoScrollingRef.current = false, 1000);
-            }
-        }
     };
 
     const handleNavigateDay = (direction) => {
@@ -749,6 +783,15 @@ function AppInternal() {
             <main className="px-3 max-w-2xl mx-auto space-y-4 pt-4">
                 {activeTab === 'log' ? (
                     <>
+                        {isBathOverdue && (
+                            <section className="bg-sky-500 text-white p-4 rounded-[1.8rem] shadow-lg flex items-center gap-4 border border-sky-400 animate-in fade-in duration-500">
+                                <AlertCircle size={28} className="shrink-0" />
+                                <div className="flex-1">
+                                    <h4 className="font-black text-xs uppercase mb-0.5 tracking-wider">Tijd voor een bad!</h4>
+                                    <p className="text-[11px] font-bold opacity-90 leading-tight">Het is {bathGoal.intervalDays} dagen of langer geleden.</p>
+                                </div>
+                            </section>
+                        )}
                         {missingVitamins.length > 0 && (
                             <section className="bg-orange-500 text-white p-4 rounded-[1.8rem] shadow-lg flex items-center gap-4 border border-orange-400 animate-in fade-in duration-500">
                                 <AlertCircle size={28} className="shrink-0" />
@@ -786,10 +829,10 @@ function AppInternal() {
                             setHasPlas={setHasPlas}
                             hasPoep={hasPoep}
                             setHasPoep={setHasPoep}
-                            hasVitamins={hasVitamins}
-                            setHasVitamins={setHasVitamins}
                             vitamins={vitamins}
                             setVitamins={setVitamins}
+                            hasBath={hasBath}
+                            setHasBath={setHasBath}
                         />
 
                         <LogList
@@ -824,6 +867,8 @@ function AppInternal() {
                         toggleVisibility={toggleVisibility}
                         vitRequirements={vitRequirements}
                         toggleRequirement={toggleRequirement}
+                        bathGoal={bathGoal}
+                        onBathGoalChange={handleBathGoalChange}
                         handleExport={handleExport}
                         fileInputRef={fileInputRef}
                         handleImport={handleImport}

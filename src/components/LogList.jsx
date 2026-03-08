@@ -3,7 +3,7 @@
  * It groups them by day and provides functionality to edit or delete entries.
  */
 import React from 'react';
-import { Heart, Milk, Utensils, Droplets, Sparkles, Baby, Clock, Trash2 } from 'lucide-react';
+import { Heart, Milk, Utensils, Droplets, Sparkles, Baby, Clock, Trash2, Bath } from 'lucide-react';
 import { getRelativeDateLabel, formatTime, getIntervalStyle } from '../utils/helpers';
 
 export function LogList({
@@ -40,7 +40,8 @@ export function LogList({
                         else if (log.feedType === 'Vast') icons.push(<Utensils size={20} className="text-orange-500" />);
 
                         if (log.hasPlas || log.hasPoep) icons.push(<Droplets size={18} className={log.hasPoep ? 'text-amber-700' : 'text-yellow-400'} />);
-                        if (log.hasVitamins) icons.push(<Sparkles size={18} className="text-purple-500" />);
+                        if (log.vitamins?.d || log.vitamins?.k) icons.push(<Sparkles size={18} className="text-purple-500" />);
+                        if (log.hasBath) icons.push(<Bath size={18} className="text-sky-500" />);
                         if (icons.length === 0) icons.push(<Baby size={20} className="text-slate-400" />);
 
                         const intervalObj = typeIntervals[log.id];
@@ -72,7 +73,8 @@ export function LogList({
                                         {log.feedType === 'Borst' && log.firstBreast && <div className="text-[9px] font-black uppercase text-pink-600 bg-pink-500/10 px-1.5 py-0.5 rounded-md">Start: {log.firstBreast}</div>}
                                         {log.hasPlas && <div className="text-[9px] font-black uppercase text-yellow-600">Plas</div>}
                                         {log.hasPoep && <div className="text-[9px] font-black uppercase text-amber-900">Poep</div>}
-                                        {log.hasVitamins && <div className="text-[9px] font-black uppercase text-purple-600">Vita: {log.vitamins?.d ? 'D' : ''}{log.vitamins?.k ? '+K' : ''}</div>}
+                                        {(log.vitamins?.d || log.vitamins?.k) && <div className="text-[9px] font-black uppercase text-purple-600">Vita: {log.vitamins.d ? 'D' : ''}{log.vitamins.k ? (log.vitamins.d ? '+K' : 'K') : ''}</div>}
+                                        {log.hasBath && <div className="text-[9px] font-black uppercase text-sky-600">Bad</div>}
                                     </div>
                                 </div>
                             </div>

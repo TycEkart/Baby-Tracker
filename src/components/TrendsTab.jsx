@@ -3,7 +3,7 @@
  * and a daily timeline chart. It's a data-heavy component that does a lot
  * of calculations to visualize the baby's activity over time.
  */
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Clock, Milk, Heart, Utensils, ChevronLeft, ChevronRight, Droplets } from 'lucide-react';
 import { getRelativeDateLabel, formatTime, toSafeDate } from '../utils/helpers';
 
@@ -21,6 +21,18 @@ export function TrendsTab({
 }) {
     const timelineScrollRef = useRef(null);
     const isAutoScrollingRef = useRef(false);
+
+    useEffect(() => {
+        const dayIndex = trendsChartData.findIndex(d => d.id === selectedDayId);
+        if (dayIndex !== -1 && timelineScrollRef.current) {
+            isAutoScrollingRef.current = true;
+            timelineScrollRef.current.scrollTo({
+                left: dayIndex * 960,
+                behavior: 'smooth'
+            });
+            setTimeout(() => isAutoScrollingRef.current = false, 1000);
+        }
+    }, [selectedDayId, trendsChartData]);
 
     const handleTimelineScroll = () => {
         if (isAutoScrollingRef.current) return;
@@ -130,9 +142,10 @@ export function TrendsTab({
                     <div className="overflow-x-auto overflow-y-hidden custom-scrollbar h-[220px]" ref={timelineScrollRef} onScroll={handleTimelineScroll} style={{ touchAction: 'pan-x' }}>
                         <div className="flex relative h-full" style={{ width: `${trendsChartData.length * 960}px` }}>
                             {trendsChartData.map((day, idx) => {
-                                const bgClass = day.id === selectedDayId
-                                    ? (isDarkMode ? 'bg-slate-800/80' : 'bg-indigo-50/80')
-                                    : (idx % 2 === 0 ? (isDarkMode ? 'bg-slate-900' : 'bg-slate-200/60') : (isDarkMode ? 'bg-slate-950' : 'bg-slate-50'));
+                                const dayOfMonth = toSafeDate(day.date).getDate();
+                                const bgClass = isDarkMode
+                                    ? (dayOfMonth % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900')
+                                    : (dayOfMonth % 2 === 0 ? 'bg-slate-50' : 'bg-slate-100');
 
                                 return (
                                     <div key={day.id} className={`relative w-[960px] h-full transition-colors ${bgClass}`}>
@@ -141,7 +154,7 @@ export function TrendsTab({
                                         </div>
 
                                         {[...Array(25)].map((_, h) => (
-                                            <div key={h} className="absolute top-0 h-full border-l border-slate-100 dark:border-slate-800 flex flex-col justify-end pb-8" style={{ left: `${(h / 24) * 100}%` }}>
+                                            <div key={h} className="absolute top-0 h-full border-l border-slate-500/10 flex flex-col justify-end pb-8" style={{ left: `${(h / 24) * 100}%` }}>
                                                 {h % 6 === 0 && <span className="text-[9px] font-black opacity-30 -translate-x-1/2">{h}:00</span>}
                                             </div>
                                         ))}
