@@ -140,15 +140,23 @@ function AppInternal() {
     const isAutoScrollingRef = useRef(false);
     const fileInputRef = useRef(null);
 
-    // --- BROWSER HISTORY INTEGRATION ---
+    // --- BROWSER HISTORY & VISIBILITY INTEGRATION ---
     useEffect(() => {
         const handleHashChange = () => {
             setActiveTab(window.location.hash.substring(1) || 'log');
         };
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                setTimestamp(getLocalDateTimeString());
+            }
+        };
 
         window.addEventListener('popstate', handleHashChange);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         return () => {
             window.removeEventListener('popstate', handleHashChange);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 
@@ -467,6 +475,48 @@ function AppInternal() {
     // --- MEMOS & COMPUTED STATE ---
     const isOwner = useMemo(() => user && account && account.owner === user.uid, [user, account]);
 
+    const dailyStats = useMemo(() => {
+        const todayStr = toLocalDateString(new Date());
+        const todaysLogs = logs.filter(l => toLocalDateString(l.timestamp) === todayStr);
+        const todaysFeedings = todaysLogs
+            .filter(l => l.feedType)
+            .sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
+
+        const feedCount = todaysFeedings.length;
+
+        let avgInterval = null;
+        if (feedCount >= 2) {
+            const intervals = [];
+            for (let i = 1; i < todaysFeedings.length; i++) {
+                const diff = getDiffMinutes(todaysFeedings[i - 1].timestamp, todaysFeedings[i].timestamp);
+                intervals.push(diff);
+            }
+            const totalMinutes = intervals.reduce((sum, interval) => sum + interval, 0);
+            const avgMinutes = totalMinutes / intervals.length;
+            avgInterval = formatDuration(Math.round(avgMinutes));
+        }
+
+        const totalFles = todaysLogs
+            .filter(l => l.feedType === 'Fles')
+            .reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+
+        const totalBorst = todaysLogs
+            .filter(l => l.feedType === 'Borst')
+            .reduce((sum, l) => sum + (Number(l.amountLeft) || 0) + (Number(l.amountRight) || 0), 0);
+
+        const totalVast = todaysLogs
+            .filter(l => l.feedType === 'Vast')
+            .reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+
+        return {
+            feedCount,
+            avgInterval,
+            totalFles,
+            totalBorst,
+            totalVast,
+        };
+    }, [logs]);
+
     const typeIntervals = useMemo(() => {
         const sorted = [...logs].sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
         const result = {};
@@ -500,7 +550,7 @@ function AppInternal() {
         const sortedFeedings = logs.filter(l => l.feedType).sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
         const map = {};
         sortedFeedings.forEach((log, i) => {
-            if (i > 0) map[log.id] = formatDuration(getDiffMinutes(sortedFeedings[i-1].timestamp, log.timestamp));
+            if (i > 0) map[log.id] = formatDuration(getDiffMinutes(sortedFeedings[i - 1].timestamp, log.timestamp));
         });
         return map;
     }, [logs]);
@@ -713,6 +763,7 @@ function AppInternal() {
                             editingId={editingId}
                             isDarkMode={isDarkMode}
                             lastFeedingLabel={lastFeedingLabel}
+                            dailyStats={dailyStats}
                             handleSave={handleSave}
                             isSubmitting={isSubmitting}
                             isFormValid={isFormValid}

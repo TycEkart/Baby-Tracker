@@ -14,6 +14,7 @@ export function LogForm({
     editingId,
     isDarkMode,
     lastFeedingLabel,
+    dailyStats,
     handleSave,
     isSubmitting,
     isFormValid,
@@ -65,32 +66,54 @@ export function LogForm({
         return { background: `linear-gradient(to bottom right, ${colors.join(', ')})` };
     };
 
+    const [datePart, timePart] = formatDateTimeFull(timestamp).split(', ');
+
     return (
         <section className={`p-5 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} ${editingId ? 'ring-2 ring-indigo-500 shadow-xl' : ''}`}>
-            <div className="flex items-center gap-2 mb-6 px-1">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-indigo-500 ${isDarkMode ? 'bg-slate-800' : 'bg-indigo-50'}`}><Clock size={18} /></div>
-                <div className="flex flex-col">
-                    <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-300' : 'text-slate-500'}`}>Laatste voeding</span>
-                    <span className={`text-sm font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-700'}`}>{lastFeedingLabel} geleden</span>
+            <div className="flex items-start justify-between gap-4 mb-6 px-1">
+                <div className="flex items-center gap-2">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-indigo-500 ${isDarkMode ? 'bg-slate-800' : 'bg-indigo-50'}`}><Clock size={18} /></div>
+                    <div className="flex flex-col">
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-300' : 'text-slate-500'}`}>Laatste voeding</span>
+                        <span className={`text-sm font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-700'}`}>{lastFeedingLabel} geleden</span>
+                    </div>
                 </div>
+                {dailyStats.feedCount > 0 && (
+                    <div className="text-right">
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-300' : 'text-slate-500'}`}>Vandaag</span>
+                        <p className={`text-sm font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-700'}`}>
+                            {dailyStats.feedCount} voedingen
+                            {dailyStats.avgInterval && <span className="text-xs opacity-60"> (~{dailyStats.avgInterval})</span>}
+                        </p>
+                        <div className="text-xs opacity-70">
+                            {dailyStats.totalFles > 0 && <span>{dailyStats.totalFles}ml fles </span>}
+                            {dailyStats.totalBorst > 0 && <span>{dailyStats.totalBorst}m borst </span>}
+                            {dailyStats.totalVast > 0 && <span>{dailyStats.totalVast}g vast</span>}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <form onSubmit={handleSave} className="space-y-6">
                 <div className="space-y-2">
-                    <button type="button" onClick={() => dateTimeInputRef.current.showPicker()} className={`w-full text-left relative group overflow-hidden rounded-2xl border p-4 shadow-inner cursor-pointer ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
-                        <div className="absolute top-2 left-4 text-[9px] font-black uppercase tracking-[0.2em] pointer-events-none text-slate-400">Datum & Tijd</div>
-                        <div className={`flex items-center justify-between pt-3 pointer-events-none ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                            <span className="text-sm font-black uppercase">{formatDateTimeFull(timestamp)}</span>
-                            <Calendar size={18} className="text-indigo-500" />
+                    <div className="grid grid-cols-4 gap-1.5 px-0.5">
+                        {[{ label: '+1u', val: 60 }, { label: '+10m', val: 10 }, { label: '+5m', val: 5 }, { label: '+1m', val: 1 }
+                        ].map((btn, idx) => (
+                            <button key={idx} type="button" onClick={() => adjustTime(btn.val)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border transition-all active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-200 text-indigo-600'}`}>{btn.label}</button>
+                        ))}
+                    </div>
+
+                    <button type="button" onClick={() => dateTimeInputRef.current.showPicker()} className={`w-full text-center relative group overflow-hidden rounded-2xl border p-4 shadow-inner cursor-pointer ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                        <div className={`flex flex-col items-center justify-center pointer-events-none ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                            <span className="text-xs font-semibold uppercase opacity-70">{datePart}</span>
+                            <span className="text-3xl font-black">{timePart}</span>
                         </div>
+                        <Calendar size={18} className="absolute top-3 right-3 text-indigo-500 opacity-50" />
                     </button>
                     <input ref={dateTimeInputRef} type="datetime-local" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} className="hidden" />
 
-
                     <div className="grid grid-cols-4 gap-1.5 px-0.5">
-                        {[
-                            { label: '-1u', val: -60 }, { label: '-10m', val: -10 }, { label: '-5m', val: -5 }, { label: '-1m', val: -1 },
-                            { label: '+1u', val: 60 }, { label: '+10m', val: 10 }, { label: '+5m', val: 5 }, { label: '+1m', val: 1 }
+                        {[{ label: '-1u', val: -60 }, { label: '-10m', val: -10 }, { label: '-5m', val: -5 }, { label: '-1m', val: -1 }
                         ].map((btn, idx) => (
                             <button key={idx} type="button" onClick={() => adjustTime(btn.val)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border transition-all active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-200 text-indigo-600'}`}>{btn.label}</button>
                         ))}

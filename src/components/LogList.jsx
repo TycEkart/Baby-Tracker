@@ -57,7 +57,7 @@ export function LogList({
                                             {intervalObj && (
                                                 <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${getIntervalStyle(intervalObj.category, isDarkMode)}`}>
                                                     <Clock size={10} />
-                                                    <span className="text-[10px] font-black">+{intervalObj.text}</span>
+                                                    <span className="text-[10px] font-black">{intervalObj.text}</span>
                                                 </div>
                                             )}
                                             <button onClick={(e) => { e.stopPropagation(); setItemToDelete(log.id); }} className="text-slate-300 hover:text-red-500 transition-colors">

@@ -62,12 +62,12 @@ export const getLocalDateTimeString = (date = new Date()) => {
 
 export const getIntervalStyle = (cat, isDark) => {
     switch(cat) {
-        case 'Borst': return isDark ? 'text-pink-400 bg-pink-500/10 border-pink-500/20' : 'text-pink-600 bg-pink-50 border-pink-100';
-        case 'Fles': return isDark ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' : 'text-indigo-600 bg-indigo-50 border-indigo-100';
-        case 'Vast': return isDark ? 'text-orange-400 bg-orange-500/10 border-orange-500/20' : 'text-orange-600 bg-orange-50 border-orange-100';
-        case 'poep': return isDark ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-amber-700 bg-amber-50 border-amber-100';
-        case 'plas': return isDark ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' : 'text-yellow-600 bg-yellow-50 border-yellow-100';
-        case 'vitamins': return isDark ? 'text-purple-400 bg-purple-500/10 border-purple-500/20' : 'text-purple-600 bg-purple-50 border-purple-100';
+        case 'Borst': return isDark ? 'text-pink-200 bg-pink-500/10 border-pink-500/20' : 'text-pink-600 bg-pink-50 border-pink-100';
+        case 'Fles': return isDark ? 'text-indigo-200 bg-indigo-500/10 border-indigo-500/20' : 'text-indigo-600 bg-indigo-50 border-indigo-100';
+        case 'Vast': return isDark ? 'text-orange-200 bg-orange-500/10 border-orange-500/20' : 'text-orange-600 bg-orange-50 border-orange-100';
+        case 'poep': return isDark ? 'text-amber-200 bg-amber-500/10 border-amber-500/20' : 'text-amber-700 bg-amber-50 border-amber-100';
+        case 'plas': return isDark ? 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20' : 'text-yellow-600 bg-yellow-50 border-yellow-100';
+        case 'vitamins': return isDark ? 'text-purple-200 bg-purple-500/10 border-purple-500/20' : 'text-purple-600 bg-purple-50 border-purple-100';
         default: return 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700';
     }
 };
