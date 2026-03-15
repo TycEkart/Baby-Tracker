@@ -947,7 +947,7 @@ function AppInternal() {
                         bathGoal={bathGoal}
                         onBathGoalChange={handleBathGoalChange}
                         handleExport={handleExport}
-                        fileInputRef={fileInput_ref}
+                        fileInputRef={fileInputRef}
                         handleImport={handleImport}
                         isOwner={isOwner}
                         newMemberUid={newMemberUid}
