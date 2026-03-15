@@ -49,6 +49,11 @@ export const getDiffMinutes = (start, end) => {
 
 export const formatDuration = (mins) => {
     if (mins < 0 || isNaN(mins)) return "0m";
+    if (mins >= 1440) { // 24 * 60 = 1440 minutes in a day
+        const d = Math.floor(mins / 1440);
+        const h = Math.floor((mins % 1440) / 60);
+        return `${d}d ${h}u`;
+    }
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     return h > 0 ? `${h}u ${m}m` : `${m}m`;

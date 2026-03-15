@@ -6,6 +6,20 @@ import React from 'react';
 import { Heart, Milk, Utensils, Droplets, Sparkles, Baby, Clock, Trash2, Bath } from 'lucide-react';
 import { getRelativeDateLabel, formatTime, getIntervalStyle } from '../utils/helpers';
 
+// Helper to get the icon for a given category
+const getCategoryIcon = (category) => {
+    switch (category) {
+        case 'Borst': return <Heart size={10} />;
+        case 'Fles': return <Milk size={10} />;
+        case 'Vast': return <Utensils size={10} />;
+        case 'poep': return <Droplets size={10} />;
+        case 'plas': return <Droplets size={10} />;
+        case 'vitamins': return <Sparkles size={10} />;
+        case 'bath': return <Bath size={10} />;
+        default: return <Clock size={10} />;
+    }
+};
+
 export function LogList({
     groupedLogsList,
     highlightedId,
@@ -51,7 +65,17 @@ export function LogList({
                         if (log.hasBath) icons.push(<Bath size={18} className="text-sky-500" />);
                         if (icons.length === 0) icons.push(<Baby size={20} className="text-slate-400" />);
 
-                        const intervalObj = typeIntervals[log.id];
+                        const intervalArray = typeIntervals[log.id] || [];
+
+                        // Group intervals by their 'text' value
+                        const groupedIntervals = intervalArray.reduce((acc, interval) => {
+                            if (!acc[interval.text]) {
+                                acc[interval.text] = { ...interval, categories: [interval.category] };
+                            } else {
+                                acc[interval.text].categories.push(interval.category);
+                            }
+                            return acc;
+                        }, {});
 
                         return (
                             <div key={log.id} id={`log-item-${log.id}`} onClick={() => startEdit(log)} className={`p-4 rounded-[1.8rem] border flex items-center gap-4 transition-all duration-700 cursor-pointer border-slate-100 dark:border-slate-800 ${getBg()}`}>
@@ -59,16 +83,16 @@ export function LogList({
                                     {icons.map((icon, idx) => <div key={idx} className="animate-in zoom-in duration-300">{icon}</div>)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="font-black opacity-60">{formatTime(log.timestamp)}</span>
-                                        <div className="flex items-center gap-3">
-                                            {intervalObj && (
-                                                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${getIntervalStyle(intervalObj.category, isDarkMode)}`}>
-                                                    <Clock size={10} />
+                                    <div className="flex justify-between items-start mb-1">
+                                        <span className="font-black opacity-60 mt-1">{formatTime(log.timestamp)}</span>
+                                        <div className="flex items-center justify-end flex-wrap gap-1">
+                                            {Object.values(groupedIntervals).map((intervalObj, idx) => (
+                                                <div key={idx} className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${getIntervalStyle(intervalObj.category, isDarkMode)}`}>
+                                                    {intervalObj.categories.map(cat => getCategoryIcon(cat))}
                                                     <span className="font-black">{intervalObj.text}</span>
                                                 </div>
-                                            )}
-                                            <button onClick={(e) => { e.stopPropagation(); setItemToDelete(log.id); }} className="text-slate-300 hover:text-red-500 transition-colors">
+                                            ))}
+                                            <button onClick={(e) => { e.stopPropagation(); setItemToDelete(log.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-1">
                                                 <Trash2 size={18} />
                                             </button>
                                         </div>

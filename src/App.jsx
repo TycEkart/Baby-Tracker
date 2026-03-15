@@ -554,33 +554,74 @@ function AppInternal() {
     }, [logs]);
 
     const typeIntervals = useMemo(() => {
+        // Chronological sort: from oldest to newest
         const sorted = [...logs].sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
         const result = {};
-        const lastSeen = { feeding: null, poep: null, plas: null, vitamins: null, bath: null };
+        const lastSeen = {
+            // Initialize lastSeen for all potential categories
+            'Fles': null,
+            'Borst': null,
+            'Vast': null,
+            'poep': null,
+            'plas': null,
+            'vitamins': null,
+            'bath': null
+        };
 
         sorted.forEach(log => {
             const ts = toSafeDate(log.timestamp);
-            let data = null;
+            const logIntervals = [];
 
+            // Check each category independently
             if (log.feedType) {
-                if (lastSeen.feeding) data = { text: formatDuration(getDiffMinutes(lastSeen.feeding, ts)), category: log.feedType };
-            } else if (log.hasPoep) {
-                if (lastSeen.poep) data = { text: formatDuration(getDiffMinutes(lastSeen.poep, ts)), category: 'poep' };
-            } else if (log.hasPlas) {
-                if (lastSeen.plas) data = { text: formatDuration(getDiffMinutes(lastSeen.plas, ts)), category: 'plas' };
-            } else if (log.hasVitamins) {
-                if (lastSeen.vitamins) data = { text: formatDuration(getDiffMinutes(lastSeen.vitamins, ts)), category: 'vitamins' };
-            } else if (log.hasBath) {
-                if (lastSeen.bath) data = { text: formatDurationInDays(lastSeen.bath, ts), category: 'bath' };
+                if (lastSeen[log.feedType]) {
+                    logIntervals.push({
+                        text: formatDuration(getDiffMinutes(lastSeen[log.feedType], ts)),
+                        category: log.feedType
+                    });
+                }
+                lastSeen[log.feedType] = ts;
+            }
+            if (log.hasPoep) {
+                if (lastSeen.poep) {
+                    logIntervals.push({
+                        text: formatDuration(getDiffMinutes(lastSeen.poep, ts)),
+                        category: 'poep'
+                    });
+                }
+                lastSeen.poep = ts;
+            }
+            if (log.hasPlas) {
+                if (lastSeen.plas) {
+                    logIntervals.push({
+                        text: formatDuration(getDiffMinutes(lastSeen.plas, ts)),
+                        category: 'plas'
+                    });
+                }
+                lastSeen.plas = ts;
+            }
+            if (log.vitamins?.d || log.vitamins?.k) {
+                if (lastSeen.vitamins) {
+                    logIntervals.push({
+                        text: formatDuration(getDiffMinutes(lastSeen.vitamins, ts)),
+                        category: 'vitamins'
+                    });
+                }
+                lastSeen.vitamins = ts;
+            }
+            if (log.hasBath) {
+                if (lastSeen.bath) {
+                    logIntervals.push({
+                        text: formatDurationInDays(lastSeen.bath, ts),
+                        category: 'bath'
+                    });
+                }
+                lastSeen.bath = ts;
             }
 
-            result[log.id] = data;
-
-            if (log.feedType) lastSeen.feeding = ts;
-            if (log.hasPoep) lastSeen.poep = ts;
-            if (log.hasPlas) lastSeen.plas = ts;
-            if (log.hasVitamins) lastSeen.vitamins = ts;
-            if (log.hasBath) lastSeen.bath = ts;
+            if (logIntervals.length > 0) {
+                result[log.id] = logIntervals;
+            }
         });
         return result;
     }, [logs]);
@@ -906,7 +947,7 @@ function AppInternal() {
                         bathGoal={bathGoal}
                         onBathGoalChange={handleBathGoalChange}
                         handleExport={handleExport}
-                        fileInputRef={fileInputRef}
+                        fileInputRef={fileInput_ref}
                         handleImport={handleImport}
                         isOwner={isOwner}
                         newMemberUid={newMemberUid}
