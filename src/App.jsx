@@ -41,6 +41,7 @@ import { LogForm } from './components/LogForm';
 import { LogList } from './components/LogList';
 import { TrendsTab } from './components/TrendsTab';
 import { SettingsTab } from './components/SettingsTab';
+import iconUrl from './assets/icon.svg';
 
 // --- CONFIGURATIE ---
 const APP_VERSION = '1.81.4';
@@ -739,8 +740,8 @@ function AppInternal() {
 
     if (loading) {
         return (
-            <div className={`h-screen flex items-center justify-center text-indigo-500 animate-pulse ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
-                <Baby size={64} />
+            <div className="h-screen flex items-center justify-center text-indigo-500 animate-pulse bg-slate-950">
+                <img src={iconUrl} className="w-16 h-16" alt="Loading" />
             </div>
         );
     }
