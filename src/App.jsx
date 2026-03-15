@@ -113,6 +113,7 @@ function AppInternal() {
     const [newMemberUid, setNewMemberUid] = useState('');
 
     // Settings
+    const [fontSize, setFontSize] = useState(2);
     const [vitRequirements, setVitRequirements] = useState({ d: false, k: false });
     const [bathGoal, setBathGoal] = useState({ enabled: false, intervalDays: 3 });
     const [visibilitySettings, setVisibilitySettings] = useState({ Fles: true, Borst: true, Vast: true });
@@ -308,6 +309,13 @@ function AppInternal() {
         }
     };
 
+    const handleFontSizeChange = async (size) => {
+        setFontSize(size);
+        if (user && db && account) {
+            await setDoc(doc(db, 'accounts', account.id, 'settings', 'appearance'), { fontSize: size }, { merge: true });
+        }
+    };
+
     const toggleVisibility = async (key) => {
         const newVis = { ...visibilitySettings, [key]: !visibilitySettings[key] };
         setVisibilitySettings(newVis);
@@ -418,7 +426,10 @@ function AppInternal() {
                             }
                         };
                         await Promise.all([
-                            loadSet('appearance', (d) => setIsDarkMode(!!d.isDarkMode)),
+                            loadSet('appearance', (d) => {
+                                setIsDarkMode(!!d.isDarkMode);
+                                if (d.fontSize) setFontSize(d.fontSize);
+                            }),
                             loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
                             loadSet('vitamin_requirements', (d) => setVitRequirements(d)),
                             loadSet('bath_goal', (d) => setBathGoal(g => ({...g, ...d})), { enabled: false, intervalDays: 3 })
@@ -755,6 +766,11 @@ function AppInternal() {
         }
     };
 
+    const fontSizeClass = useMemo(() => {
+        const sizes = ['text-xs', 'text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl'];
+        return sizes[fontSize] || 'text-base';
+    }, [fontSize]);
+
     if (loading) {
         return (
             <div className="h-screen flex items-center justify-center text-indigo-500 animate-pulse bg-slate-950">
@@ -772,7 +788,7 @@ function AppInternal() {
     }
 
     return (
-        <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} font-sans pb-10 overflow-x-hidden`}>
+        <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} font-sans pb-10 overflow-x-hidden ${fontSizeClass}`}>
             {dbError && (
                 <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between z-[100] sticky top-0 animate-in slide-in-from-top-full duration-300">
                     <div className="flex items-center gap-3"><Bug size={18} /><span className="text-[11px] font-bold opacity-90">{dbError}</span></div>
@@ -881,6 +897,8 @@ function AppInternal() {
                     <SettingsTab
                         isDarkMode={isDarkMode}
                         toggleDarkMode={toggleDarkMode}
+                        fontSize={fontSize}
+                        onFontSizeChange={handleFontSizeChange}
                         visibilitySettings={visibilitySettings}
                         toggleVisibility={toggleVisibility}
                         vitRequirements={vitRequirements}

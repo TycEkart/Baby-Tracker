@@ -23,8 +23,8 @@ export function LogList({
                     <div className="flex items-center justify-between gap-3 py-2">
                         <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800"></div>
                         <div className="text-center">
-                            <span className="text-[11px] font-bold uppercase text-slate-500">{getRelativeDateLabel(group.date)}</span>
-                            <div className="text-xs opacity-70">
+                            <span className="font-bold uppercase text-slate-500">{getRelativeDateLabel(group.date)}</span>
+                            <div className="opacity-70">
                                 {group.totalFles > 0 && <span>{group.totalFles}ml fles </span>}
                                 {group.totalBorst > 0 && <span>{group.totalBorst}m borst </span>}
                                 {group.totalVast > 0 && <span>{group.totalVast}g vast</span>}
@@ -60,12 +60,12 @@ export function LogList({
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="text-xs font-black opacity-60">{formatTime(log.timestamp)}</span>
+                                        <span className="font-black opacity-60">{formatTime(log.timestamp)}</span>
                                         <div className="flex items-center gap-3">
                                             {intervalObj && (
                                                 <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${getIntervalStyle(intervalObj.category, isDarkMode)}`}>
                                                     <Clock size={10} />
-                                                    <span className="text-[10px] font-black">{intervalObj.text}</span>
+                                                    <span className="font-black">{intervalObj.text}</span>
                                                 </div>
                                             )}
                                             <button onClick={(e) => { e.stopPropagation(); setItemToDelete(log.id); }} className="text-slate-300 hover:text-red-500 transition-colors">
@@ -73,15 +73,15 @@ export function LogList({
                                             </button>
                                         </div>
                                     </div>
-                                    <h3 className="font-black text-sm">
+                                    <h3 className="font-black">
                                         {log.feedType === 'Borst' ? `L: ${log.amountLeft}m | R: ${log.amountRight}m` : log.feedType ? `${log.amount}${log.feedType === 'Vast' ? 'g' : 'ml'} ${log.feedType}` : 'Gebeurtenis'}
                                     </h3>
                                     <div className="flex flex-wrap gap-2 mt-1">
-                                        {log.feedType === 'Borst' && log.firstBreast && <div className="text-[9px] font-black uppercase text-pink-600 bg-pink-500/10 px-1.5 py-0.5 rounded-md">Start: {log.firstBreast}</div>}
-                                        {log.hasPlas && <div className="text-[9px] font-black uppercase text-yellow-600">Plas</div>}
-                                        {log.hasPoep && <div className="text-[9px] font-black uppercase text-amber-900">Poep</div>}
-                                        {(log.vitamins?.d || log.vitamins?.k) && <div className="text-[9px] font-black uppercase text-purple-600">Vita: {log.vitamins.d ? 'D' : ''}{log.vitamins.k ? (log.vitamins.d ? '+K' : 'K') : ''}</div>}
-                                        {log.hasBath && <div className="text-[9px] font-black uppercase text-sky-600">Bad</div>}
+                                        {log.feedType === 'Borst' && log.firstBreast && <div className="font-black uppercase text-pink-600 bg-pink-500/10 px-1.5 py-0.5 rounded-md">Start: {log.firstBreast}</div>}
+                                        {log.hasPlas && <div className="font-black uppercase text-yellow-600">Plas</div>}
+                                        {log.hasPoep && <div className="font-black uppercase text-amber-900">Poep</div>}
+                                        {(log.vitamins?.d || log.vitamins?.k) && <div className="font-black uppercase text-purple-600">Vita: {log.vitamins.d ? 'D' : ''}{log.vitamins.k ? (log.vitamins.d ? '+K' : 'K') : ''}</div>}
+                                        {log.hasBath && <div className="font-black uppercase text-sky-600">Bad</div>}
                                     </div>
                                 </div>
                             </div>

@@ -5,12 +5,14 @@
  */
 import React from 'react';
 import {
-    Moon, Sun, Eye, ShieldCheck, Database, Download, Upload, ArrowRight, Users, Plus, LogOut, Bath
+    Moon, Sun, Eye, ShieldCheck, Database, Download, Upload, ArrowRight, Users, Plus, LogOut, Bath, CaseSensitive
 } from 'lucide-react';
 
 export function SettingsTab({
     isDarkMode,
     toggleDarkMode,
+    fontSize,
+    onFontSizeChange,
     visibilitySettings,
     toggleVisibility,
     vitRequirements,
@@ -40,6 +42,20 @@ export function SettingsTab({
                     <div className="flex items-center gap-3">{isDarkMode ? <Sun className="text-amber-400" /> : <Moon />} <span>{isDarkMode ? 'Lichte Modus' : 'Donkere Modus'}</span></div>
                     <div className={`w-12 h-6 rounded-full relative transition-colors ${isDarkMode ? 'bg-indigo-600' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isDarkMode ? 'left-7' : 'left-1'}`} /></div>
                 </button>
+                <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                        <CaseSensitive size={20} className="text-indigo-500" />
+                        <h4 className="font-black uppercase text-sm tracking-tight">Tekstgrootte</h4>
+                    </div>
+                    <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        value={fontSize}
+                        onChange={(e) => onFontSizeChange(parseInt(e.target.value, 10))}
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-700"
+                    />
+                </div>
             </section>
 
             <section className={`p-6 rounded-[2rem] border shadow-sm space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
