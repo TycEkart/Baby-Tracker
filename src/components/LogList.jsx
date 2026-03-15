@@ -20,9 +20,16 @@ export function LogList({
         <div className="space-y-6 mt-8 pb-10">
             {groupedLogsList.map(group => (
                 <div key={group.date} className="space-y-2">
-                    <div className="flex items-center gap-3 py-2">
+                    <div className="flex items-center justify-between gap-3 py-2">
                         <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800"></div>
-                        <span className="text-[11px] font-bold uppercase text-slate-500">{getRelativeDateLabel(group.date)}</span>
+                        <div className="text-center">
+                            <span className="text-[11px] font-bold uppercase text-slate-500">{getRelativeDateLabel(group.date)}</span>
+                            <div className="text-xs opacity-70">
+                                {group.totalFles > 0 && <span>{group.totalFles}ml fles </span>}
+                                {group.totalBorst > 0 && <span>{group.totalBorst}m borst </span>}
+                                {group.totalVast > 0 && <span>{group.totalVast}g vast</span>}
+                            </div>
+                        </div>
                         <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800"></div>
                     </div>
                     {group.items.map(log => {

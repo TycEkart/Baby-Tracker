@@ -704,10 +704,27 @@ function AppInternal() {
         const groups = {};
         logs.forEach(l => {
             const dk = toLocalDateString(l.timestamp);
-            if (!groups[dk]) groups[dk] = [];
-            groups[dk].push(l);
+            if (!groups[dk]) {
+                groups[dk] = {
+                    items: [],
+                    totalFles: 0,
+                    totalBorst: 0,
+                    totalVast: 0,
+                };
+            }
+            groups[dk].items.push(l);
+            if (l.feedType === 'Fles') {
+                groups[dk].totalFles += Number(l.amount) || 0;
+            } else if (l.feedType === 'Borst') {
+                groups[dk].totalBorst += (Number(l.amountLeft) || 0) + (Number(l.amountRight) || 0);
+            } else if (l.feedType === 'Vast') {
+                groups[dk].totalVast += Number(l.amount) || 0;
+            }
         });
-        return Object.keys(groups).sort().reverse().map(date => ({ date, items: groups[date] }));
+        return Object.keys(groups).sort().reverse().map(date => ({
+            date,
+            ...groups[date]
+        }));
     }, [logs]);
 
     // Effects
@@ -741,7 +758,7 @@ function AppInternal() {
     if (loading) {
         return (
             <div className="h-screen flex items-center justify-center text-indigo-500 animate-pulse bg-slate-950">
-                <img src={iconUrl} className="w-16 h-16" alt="Loading" />
+                <img src={iconUrl} className="w-24 h-24" alt="Loading" />
             </div>
         );
     }
