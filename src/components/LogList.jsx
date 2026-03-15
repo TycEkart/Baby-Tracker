@@ -67,7 +67,6 @@ export function LogList({
 
                         const intervalArray = typeIntervals[log.id] || [];
 
-                        // Group intervals by their 'text' value
                         const groupedIntervals = intervalArray.reduce((acc, interval) => {
                             if (!acc[interval.text]) {
                                 acc[interval.text] = { ...interval, categories: [interval.category] };
@@ -78,34 +77,36 @@ export function LogList({
                         }, {});
 
                         return (
-                            <div key={log.id} id={`log-item-${log.id}`} onClick={() => startEdit(log)} className={`p-4 rounded-[1.8rem] border flex items-center gap-4 transition-all duration-700 cursor-pointer border-slate-100 dark:border-slate-800 ${getBg()}`}>
+                            <div key={log.id} id={`log-item-${log.id}`} onClick={() => startEdit(log)} className={`p-4 rounded-[1.8rem] border flex items-start gap-4 transition-all duration-700 cursor-pointer border-slate-100 dark:border-slate-800 ${getBg()}`}>
                                 <div className={`flex flex-wrap items-center justify-center gap-1 p-3 rounded-2xl w-16 h-16 shrink-0 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
                                     {icons.map((icon, idx) => <div key={idx} className="animate-in zoom-in duration-300">{icon}</div>)}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className="font-black opacity-60 mt-1">{formatTime(log.timestamp)}</span>
-                                        <div className="flex items-center justify-end flex-wrap gap-1">
+                                <div className="flex-1 min-w-0 flex justify-between items-start gap-2">
+                                    <div className="flex-1 min-w-0">
+                                        <span className="font-black opacity-60">{formatTime(log.timestamp)}</span>
+                                        <h3 className="font-black">
+                                            {log.feedType === 'Borst' ? `L: ${log.amountLeft}m | R: ${log.amountRight}m` : log.feedType ? `${log.amount}${log.feedType === 'Vast' ? 'g' : 'ml'} ${log.feedType}` : 'Gebeurtenis'}
+                                        </h3>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            {log.feedType === 'Borst' && log.firstBreast && <div className="font-black uppercase text-pink-600 bg-pink-500/10 px-1.5 py-0.5 rounded-md">Start: {log.firstBreast}</div>}
+                                            {log.hasPlas && <div className="font-black uppercase text-yellow-600">Plas</div>}
+                                            {log.hasPoep && <div className="font-black uppercase text-amber-900">Poep</div>}
+                                            {(log.vitamins?.d || log.vitamins?.k) && <div className="font-black uppercase text-purple-600">Vita: {log.vitamins.d ? 'D' : ''}{log.vitamins.k ? (log.vitamins.d ? '+K' : 'K') : ''}</div>}
+                                            {log.hasBath && <div className="font-black uppercase text-sky-600">Bad</div>}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <div className="flex flex-col items-end gap-1">
                                             {Object.values(groupedIntervals).map((intervalObj, idx) => (
                                                 <div key={idx} className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${getIntervalStyle(intervalObj.category, isDarkMode)}`}>
-                                                    {intervalObj.categories.map(cat => getCategoryIcon(cat))}
+                                                    {intervalObj.categories.map((cat, i) => <div key={i}>{getCategoryIcon(cat)}</div>)}
                                                     <span className="font-black">{intervalObj.text}</span>
                                                 </div>
                                             ))}
-                                            <button onClick={(e) => { e.stopPropagation(); setItemToDelete(log.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-1">
-                                                <Trash2 size={18} />
-                                            </button>
                                         </div>
-                                    </div>
-                                    <h3 className="font-black">
-                                        {log.feedType === 'Borst' ? `L: ${log.amountLeft}m | R: ${log.amountRight}m` : log.feedType ? `${log.amount}${log.feedType === 'Vast' ? 'g' : 'ml'} ${log.feedType}` : 'Gebeurtenis'}
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                        {log.feedType === 'Borst' && log.firstBreast && <div className="font-black uppercase text-pink-600 bg-pink-500/10 px-1.5 py-0.5 rounded-md">Start: {log.firstBreast}</div>}
-                                        {log.hasPlas && <div className="font-black uppercase text-yellow-600">Plas</div>}
-                                        {log.hasPoep && <div className="font-black uppercase text-amber-900">Poep</div>}
-                                        {(log.vitamins?.d || log.vitamins?.k) && <div className="font-black uppercase text-purple-600">Vita: {log.vitamins.d ? 'D' : ''}{log.vitamins.k ? (log.vitamins.d ? '+K' : 'K') : ''}</div>}
-                                        {log.hasBath && <div className="font-black uppercase text-sky-600">Bad</div>}
+                                        <button onClick={(e) => { e.stopPropagation(); setItemToDelete(log.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-1 shrink-0">
+                                            <Trash2 size={18} />
+                                        </button>
                                     </div>
                                 </div>
                             </div>
