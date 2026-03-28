@@ -555,7 +555,7 @@ function AppInternal() {
         const count = hist.length || 1;
 
         const calculateAvgInterval = (predicate) => {
-            const items = hist.flatMap(d => d.items.filter(predicate));
+            const items = hist.flatMap(d => d.items.filter(predicate)).sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
             if (items.length < 2) return 0;
             const intervals = [];
             for (let i = 1; i < items.length; i++) {
@@ -564,8 +564,30 @@ function AppInternal() {
             return intervals.reduce((a, b) => a + b, 0) / intervals.length;
         };
 
+        const calculateBucketedAvg = (predicate) => {
+            const items = hist.flatMap(d => d.items.filter(predicate)).sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
+            const buckets = { night: [], morning: [], afternoon: [], evening: [] };
+            if (items.length < 2) return { night: 0, morning: 0, afternoon: 0, evening: 0 };
+
+            for (let i = 1; i < items.length; i++) {
+                const interval = getDiffMinutes(items[i - 1].timestamp, items[i].timestamp);
+                const hour = toSafeDate(items[i].timestamp).getHours();
+                if (hour >= 0 && hour < 6) buckets.night.push(interval);
+                else if (hour >= 6 && hour < 12) buckets.morning.push(interval);
+                else if (hour >= 12 && hour < 18) buckets.afternoon.push(interval);
+                else buckets.evening.push(interval);
+            }
+
+            return {
+                night: buckets.night.length > 0 ? buckets.night.reduce((a, b) => a + b, 0) / buckets.night.length : 0,
+                morning: buckets.morning.length > 0 ? buckets.morning.reduce((a, b) => a + b, 0) / buckets.morning.length : 0,
+                afternoon: buckets.afternoon.length > 0 ? buckets.afternoon.reduce((a, b) => a + b, 0) / buckets.afternoon.length : 0,
+                evening: buckets.evening.length > 0 ? buckets.evening.reduce((a, b) => a + b, 0) / buckets.evening.length : 0,
+            };
+        };
+
         return {
-            avgFeedingInterval: calculateAvgInterval(i => i.feedType),
+            avgFeedingIntervals: calculateBucketedAvg(i => i.feedType),
             avgPlasInterval: calculateAvgInterval(i => i.hasPlas),
             avgPoepInterval: calculateAvgInterval(i => i.hasPoep),
             totalVoedingen: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType).length, 0) / count).toFixed(1),
