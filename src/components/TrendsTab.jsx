@@ -172,7 +172,7 @@ export function TrendsTab({
                                                 return (
                                                     <div key={f.id} onDoubleClick={() => { setActiveTab('log'); startEdit(f); }} className="absolute z-10 flex flex-col items-center cursor-pointer group" style={{ left: `${pos}%`, bottom: '2.5rem', width: `${barW}%` }}>
                                                         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center z-50">
-                                                            {interval && <span className={`text-[6px] font-black mb-0.5 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>+{interval}</span>}
+                                                            {interval && <span className={`text-[6px] font-black mb-0.5 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>+{interval.text}</span>}
                                                             <div className="bg-pink-600 text-white text-[8px] font-black px-1 rounded whitespace-nowrap shadow-sm">{amt}m</div>
                                                         </div>
                                                         <div className={`h-2.5 w-full rounded-full ${col} shadow-sm border border-white/20`} />
@@ -184,7 +184,7 @@ export function TrendsTab({
                                                 return (
                                                     <div key={f.id} onDoubleClick={() => { setActiveTab('log'); startEdit(f); }} className="absolute z-10 flex flex-col items-center cursor-pointer" style={{ left: `${pos}%`, bottom: '2.5rem', width: '40px', transform: 'translateX(-50%)' }}>
                                                         <div className="flex flex-col items-center mb-1">
-                                                            {interval && <span className={`text-[6px] font-black mb-0.5 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>+{interval}</span>}
+                                                            {interval && <span className={`text-[6px] font-black mb-0.5 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>+{interval.text}</span>}
                                                             <div className={`px-1.5 py-0.5 rounded-md text-white font-black text-[8px] shadow-sm ${col}`}>{amt}{f.feedType === 'Vast' ? 'g' : 'ml'}</div>
                                                         </div>
                                                         <div className={`w-2.5 rounded-full ${col} shadow-sm`} style={{ height: `${barH}px` }} />

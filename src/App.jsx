@@ -117,6 +117,7 @@ function AppInternal() {
     const [vitRequirements, setVitRequirements] = useState({ d: false, k: false });
     const [bathGoal, setBathGoal] = useState({ enabled: false, intervalDays: 3 });
     const [poopGoal, setPoopGoal] = useState({ enabled: false, intervalDays: 2 });
+    const [alertThresholds, setAlertThresholds] = useState({ feeding: 20, plas: 20, poep: 20 });
     const [visibilitySettings, setVisibilitySettings] = useState({ Fles: true, Borst: true, Vast: true });
 
     // Form states
@@ -347,6 +348,14 @@ function AppInternal() {
         }
     };
 
+    const handleAlertThresholdChange = async (type, value) => {
+        const newThresholds = { ...alertThresholds, [type]: value };
+        setAlertThresholds(newThresholds);
+        if (user && db && account) {
+            await setDoc(doc(db, 'accounts', account.id, 'settings', 'alert_thresholds'), newThresholds, { merge: true });
+        }
+    };
+
     const handleExport = () => {
         const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -441,7 +450,8 @@ function AppInternal() {
                             loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
                             loadSet('vitamin_requirements', (d) => setVitRequirements(d)),
                             loadSet('bath_goal', (d) => setBathGoal(g => ({...g, ...d})), { enabled: false, intervalDays: 3 }),
-                            loadSet('poop_goal', (d) => setPoopGoal(g => ({...g, ...d})), { enabled: false, intervalDays: 2 })
+                            loadSet('poop_goal', (d) => setPoopGoal(g => ({...g, ...d})), { enabled: false, intervalDays: 2 }),
+                            loadSet('alert_thresholds', (d) => setAlertThresholds(t => ({...t, ...d})), { feeding: 20, plas: 20, poep: 20 })
                         ]);
                     } else {
                         setAccount(null);
@@ -519,6 +529,55 @@ function AppInternal() {
 
     // --- MEMOS & COMPUTED STATE ---
     const isOwner = useMemo(() => user && account && account.owner === user.uid, [user, account]);
+
+    const trendsChartData = useMemo(() => {
+        return [...Array(7)].map((_, i) => {
+            const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
+            const ds = toLocalDateString(d);
+            const dayLogs = logs.filter(l => toLocalDateString(l.timestamp) === ds);
+            const totalVolume = dayLogs.reduce((s, l) => s + (Number(l.amount) || (Number(l.amountLeft || 0) + Number(l.amountRight || 0)) || 0), 0);
+            const hasBreastfeeding = dayLogs.some(l => l.feedType === 'Borst');
+            return {
+                id: ds, date: d,
+                label: d.toLocaleDateString('nl-NL', { weekday: 'short' }),
+                ml: totalVolume,
+                hasBreastfeeding,
+                items: dayLogs,
+                plas: dayLogs.filter(l => l.hasPlas).length,
+                poep: dayLogs.filter(l => l.hasPoep).length
+            };
+        }).reverse();
+    }, [logs]);
+
+    const weeklyAvgs = useMemo(() => {
+        const todayStr = toLocalDateString(new Date());
+        const hist = trendsChartData.filter(d => d.items.length > 0 && d.id !== todayStr);
+        const count = hist.length || 1;
+
+        const calculateAvgInterval = (predicate) => {
+            const items = hist.flatMap(d => d.items.filter(predicate));
+            if (items.length < 2) return 0;
+            const intervals = [];
+            for (let i = 1; i < items.length; i++) {
+                intervals.push(getDiffMinutes(items[i - 1].timestamp, items[i].timestamp));
+            }
+            return intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        };
+
+        return {
+            avgFeedingInterval: calculateAvgInterval(i => i.feedType),
+            avgPlasInterval: calculateAvgInterval(i => i.hasPlas),
+            avgPoepInterval: calculateAvgInterval(i => i.hasPoep),
+            totalVoedingen: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType).length, 0) / count).toFixed(1),
+            flesCount: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Fles').length, 0) / count).toFixed(1),
+            flesAmount: Math.round(hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Fles').reduce((acc, i) => acc + (Number(i.amount) || 0), 0), 0) / count),
+            borstCount: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Borst').length, 0) / count).toFixed(1),
+            borstL: Math.round(hist.reduce((s, d) => s + d.items.reduce((acc, i) => acc + (Number(i.amountLeft) || 0), 0), 0) / count),
+            borstR: Math.round(hist.reduce((s, d) => s + d.items.reduce((acc, i) => acc + (Number(i.amountRight) || 0), 0), 0) / count),
+            vastCount: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Vast').length, 0) / count).toFixed(1),
+            vastAmount: Math.round(hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Vast').reduce((acc, i) => acc + (Number(i.amount) || 0), 0), 0) / count)
+        };
+    }, [trendsChartData]);
 
     const dailyStats = useMemo(() => {
         const todayStr = toLocalDateString(new Date());
@@ -635,19 +694,25 @@ function AppInternal() {
         return result;
     }, [logs]);
 
-    const feedingIntervalsMap = useMemo(() => {
-        const sortedFeedings = logs.filter(l => l.feedType).sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
-        const map = {};
-        sortedFeedings.forEach((log, i) => {
-            if (i > 0) map[log.id] = formatDuration(getDiffMinutes(sortedFeedings[i - 1].timestamp, log.timestamp));
-        });
-        return map;
-    }, [logs]);
+    const lastLogTimes = useMemo(() => {
+        const findLast = (predicate) => {
+            const log = logs.find(predicate);
+            if (!log) return { text: '-', mins: 0 };
+            const mins = getDiffMinutes(log.timestamp, now);
+            return { text: formatDuration(mins), mins };
+        };
 
-    const lastFeedingLabel = useMemo(() => {
-        const feedings = logs.filter(l => l.feedType);
-        if (feedings.length === 0) return "Geen logs";
-        return formatDuration(getDiffMinutes(feedings[0].timestamp, now));
+        return {
+            'Fles': findLast(l => l.feedType === 'Fles'),
+            'Borst': findLast(l => l.feedType === 'Borst'),
+            'Vast': findLast(l => l.feedType === 'Vast'),
+            'plas': findLast(l => l.hasPlas),
+            'poep': findLast(l => l.hasPoep),
+            'vitaminsD': findLast(l => l.vitamins?.d),
+            'vitaminsK': findLast(l => l.vitamins?.k),
+            'bath': findLast(l => l.hasBath),
+            'feeding': findLast(l => l.feedType),
+        };
     }, [logs, now]);
 
     const isFormValid = useMemo(() => {
@@ -706,40 +771,17 @@ function AppInternal() {
         return daysSinceLastPoop >= poopGoal.intervalDays;
     }, [logs, poopGoal]);
 
-    const trendsChartData = useMemo(() => {
-        return [...Array(7)].map((_, i) => {
-            const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
-            const ds = toLocalDateString(d);
-            const dayLogs = logs.filter(l => toLocalDateString(l.timestamp) === ds);
-            const totalVolume = dayLogs.reduce((s, l) => s + (Number(l.amount) || (Number(l.amountLeft || 0) + Number(l.amountRight || 0)) || 0), 0);
-            const hasBreastfeeding = dayLogs.some(l => l.feedType === 'Borst');
-            return {
-                id: ds, date: d,
-                label: d.toLocaleDateString('nl-NL', { weekday: 'short' }),
-                ml: totalVolume,
-                hasBreastfeeding,
-                items: dayLogs,
-                plas: dayLogs.filter(l => l.hasPlas).length,
-                poep: dayLogs.filter(l => l.hasPoep).length
-            };
-        }).reverse();
+    const feedingIntervalsMap = useMemo(() => {
+        const sortedFeedings = logs.filter(l => l.feedType).sort((a, b) => toSafeDate(a.timestamp).getTime() - toSafeDate(b.timestamp).getTime());
+        const map = {};
+        sortedFeedings.forEach((log, i) => {
+            if (i > 0) {
+                const diff = getDiffMinutes(sortedFeedings[i - 1].timestamp, log.timestamp);
+                map[log.id] = { text: formatDuration(diff), mins: diff };
+            }
+        });
+        return map;
     }, [logs]);
-
-    const weeklyAvgs = useMemo(() => {
-        const todayStr = toLocalDateString(new Date());
-        const hist = trendsChartData.filter(d => d.items.length > 0 && d.id !== todayStr);
-        const count = hist.length || 1;
-        return {
-            totalVoedingen: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType).length, 0) / count).toFixed(1),
-            flesCount: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Fles').length, 0) / count).toFixed(1),
-            flesAmount: Math.round(hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Fles').reduce((acc, i) => acc + (Number(i.amount) || 0), 0), 0) / count),
-            borstCount: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Borst').length, 0) / count).toFixed(1),
-            borstL: Math.round(hist.reduce((s, d) => s + d.items.reduce((acc, i) => acc + (Number(i.amountLeft) || 0), 0), 0) / count),
-            borstR: Math.round(hist.reduce((s, d) => s + d.items.reduce((acc, i) => acc + (Number(i.amountRight) || 0), 0), 0) / count),
-            vastCount: (hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Vast').length, 0) / count).toFixed(1),
-            vastAmount: Math.round(hist.reduce((s, d) => s + d.items.filter(i => i.feedType === 'Vast').reduce((acc, i) => acc + (Number(i.amount) || 0), 0), 0) / count)
-        };
-    }, [trendsChartData]);
 
     const selectedDayStats = useMemo(() => {
         const dayData = trendsChartData.find(d => d.id === selectedDayId);
@@ -917,8 +959,10 @@ function AppInternal() {
                         <LogForm
                             editingId={editingId}
                             isDarkMode={isDarkMode}
-                            lastFeedingLabel={lastFeedingLabel}
+                            lastLogTimes={lastLogTimes}
                             dailyStats={dailyStats}
+                            weeklyAvgs={weeklyAvgs}
+                            alertThresholds={alertThresholds}
                             handleSave={handleSave}
                             isSubmitting={isSubmitting}
                             isFormValid={isFormValid}
@@ -985,6 +1029,8 @@ function AppInternal() {
                         onBathGoalChange={handleBathGoalChange}
                         poopGoal={poopGoal}
                         onPoopGoalChange={handlePoopGoalChange}
+                        alertThresholds={alertThresholds}
+                        onAlertThresholdChange={handleAlertThresholdChange}
                         handleExport={handleExport}
                         fileInputRef={fileInputRef}
                         handleImport={handleImport}

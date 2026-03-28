@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import {
-    Moon, Sun, Eye, ShieldCheck, Database, Download, Upload, ArrowRight, Users, Plus, LogOut, Bath, CaseSensitive, Droplets
+    Moon, Sun, Eye, ShieldCheck, Database, Download, Upload, ArrowRight, Users, Plus, LogOut, Bath, CaseSensitive, Droplets, Percent, Milk
 } from 'lucide-react';
 
 export function SettingsTab({
@@ -21,6 +21,8 @@ export function SettingsTab({
     onBathGoalChange,
     poopGoal,
     onPoopGoalChange,
+    alertThresholds,
+    onAlertThresholdChange,
     handleExport,
     fileInputRef,
     handleImport,
@@ -78,7 +80,7 @@ export function SettingsTab({
             <section className={`p-6 rounded-[2rem] border shadow-sm space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className="flex items-center gap-3 mb-4">
                     <ShieldCheck size={20} className="text-purple-600" />
-                    <h3 className="font-black uppercase text-sm tracking-tight">Doelen</h3>
+                    <h3 className="font-black uppercase text-sm tracking-tight">Doelen & Alarmen</h3>
                 </div>
                 <div className="space-y-2">
                     <div className={`flex items-center justify-between p-3 rounded-xl border ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
@@ -124,6 +126,46 @@ export function SettingsTab({
                                 <span className="text-xs opacity-60">dagen</span>
                             </div>
                         )}
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-black uppercase opacity-60 flex items-center gap-2"><Percent size={14} />Alarmen</span>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <Milk size={14} className="text-indigo-500" />
+                                <span className="text-xs opacity-60 flex-1">Voeding</span>
+                                <input
+                                    type="number"
+                                    value={alertThresholds.feeding}
+                                    onChange={(e) => onAlertThresholdChange('feeding', Number(e.target.value))}
+                                    className={`w-16 text-center rounded-lg p-1 text-sm ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}
+                                />
+                                <span className="text-xs opacity-60">%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Droplets size={14} className="text-yellow-500" />
+                                <span className="text-xs opacity-60 flex-1">Plas</span>
+                                <input
+                                    type="number"
+                                    value={alertThresholds.plas}
+                                    onChange={(e) => onAlertThresholdChange('plas', Number(e.target.value))}
+                                    className={`w-16 text-center rounded-lg p-1 text-sm ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}
+                                />
+                                <span className="text-xs opacity-60">%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Droplets size={14} className="text-amber-700" />
+                                <span className="text-xs opacity-60 flex-1">Poep</span>
+                                <input
+                                    type="number"
+                                    value={alertThresholds.poep}
+                                    onChange={(e) => onAlertThresholdChange('poep', Number(e.target.value))}
+                                    className={`w-16 text-center rounded-lg p-1 text-sm ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}
+                                />
+                                <span className="text-xs opacity-60">%</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
