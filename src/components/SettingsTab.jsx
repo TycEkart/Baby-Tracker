@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import {
-    Moon, Sun, Eye, ShieldCheck, Database, Download, Upload, ArrowRight, Users, Plus, LogOut, Bath, CaseSensitive
+    Moon, Sun, Eye, ShieldCheck, Database, Download, Upload, ArrowRight, Users, Plus, LogOut, Bath, CaseSensitive, Droplets
 } from 'lucide-react';
 
 export function SettingsTab({
@@ -19,6 +19,8 @@ export function SettingsTab({
     toggleRequirement,
     bathGoal,
     onBathGoalChange,
+    poopGoal,
+    onPoopGoalChange,
     handleExport,
     fileInputRef,
     handleImport,
@@ -99,6 +101,24 @@ export function SettingsTab({
                                     type="number"
                                     value={bathGoal.intervalDays}
                                     onChange={(e) => onBathGoalChange({ ...bathGoal, intervalDays: Number(e.target.value) })}
+                                    className={`w-16 text-center rounded-lg p-1 text-sm ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}
+                                />
+                                <span className="text-xs opacity-60">dagen</span>
+                            </div>
+                        )}
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-black uppercase opacity-60 flex items-center gap-2"><Droplets size={14} />Poep</span>
+                            <button onClick={() => onPoopGoalChange({ ...poopGoal, enabled: !poopGoal.enabled })} className={`w-10 h-5 rounded-full relative ${poopGoal.enabled ? 'bg-amber-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${poopGoal.enabled ? 'left-5.5' : 'left-0.5'}`} /></button>
+                        </div>
+                        {poopGoal.enabled && (
+                            <div className="mt-4 flex items-center gap-2">
+                                <span className="text-xs opacity-60">Elke</span>
+                                <input
+                                    type="number"
+                                    value={poopGoal.intervalDays}
+                                    onChange={(e) => onPoopGoalChange({ ...poopGoal, intervalDays: Number(e.target.value) })}
                                     className={`w-16 text-center rounded-lg p-1 text-sm ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}
                                 />
                                 <span className="text-xs opacity-60">dagen</span>

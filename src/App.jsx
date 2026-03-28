@@ -116,6 +116,7 @@ function AppInternal() {
     const [fontSize, setFontSize] = useState(2);
     const [vitRequirements, setVitRequirements] = useState({ d: false, k: false });
     const [bathGoal, setBathGoal] = useState({ enabled: false, intervalDays: 3 });
+    const [poopGoal, setPoopGoal] = useState({ enabled: false, intervalDays: 2 });
     const [visibilitySettings, setVisibilitySettings] = useState({ Fles: true, Borst: true, Vast: true });
 
     // Form states
@@ -339,6 +340,13 @@ function AppInternal() {
         }
     };
 
+    const handlePoopGoalChange = async (newGoal) => {
+        setPoopGoal(newGoal);
+        if (user && db && account) {
+            await setDoc(doc(db, 'accounts', account.id, 'settings', 'poop_goal'), newGoal, { merge: true });
+        }
+    };
+
     const handleExport = () => {
         const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -432,7 +440,8 @@ function AppInternal() {
                             }),
                             loadSet('visibility', (d) => setVisibilitySettings(v => ({ ...v, ...d }))),
                             loadSet('vitamin_requirements', (d) => setVitRequirements(d)),
-                            loadSet('bath_goal', (d) => setBathGoal(g => ({...g, ...d})), { enabled: false, intervalDays: 3 })
+                            loadSet('bath_goal', (d) => setBathGoal(g => ({...g, ...d})), { enabled: false, intervalDays: 3 }),
+                            loadSet('poop_goal', (d) => setPoopGoal(g => ({...g, ...d})), { enabled: false, intervalDays: 2 })
                         ]);
                     } else {
                         setAccount(null);
@@ -678,6 +687,25 @@ function AppInternal() {
         return daysSinceLastBath >= bathGoal.intervalDays;
     }, [logs, bathGoal]);
 
+    const isPoopOverdue = useMemo(() => {
+        if (!poopGoal.enabled || logs.length === 0) {
+            return false;
+        }
+        const lastPoopLog = logs.find(log => log.hasPoep);
+        if (!lastPoopLog) {
+            return true; // No poop ever recorded
+        }
+        const lastPoopDate = toSafeDate(lastPoopLog.timestamp);
+        lastPoopDate.setHours(0, 0, 0, 0);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const daysSinceLastPoop = (today.getTime() - lastPoopDate.getTime()) / (1000 * 60 * 60 * 24);
+
+        return daysSinceLastPoop >= poopGoal.intervalDays;
+    }, [logs, poopGoal]);
+
     const trendsChartData = useMemo(() => {
         return [...Array(7)].map((_, i) => {
             const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
@@ -858,6 +886,15 @@ function AppInternal() {
             <main className="px-3 max-w-2xl mx-auto space-y-4 pt-4">
                 {activeTab === 'log' ? (
                     <>
+                        {isPoopOverdue && (
+                            <section className="bg-amber-600 text-white p-4 rounded-[1.8rem] shadow-lg flex items-center gap-4 border border-amber-500 animate-in fade-in duration-500">
+                                <AlertCircle size={28} className="shrink-0" />
+                                <div className="flex-1">
+                                    <h4 className="font-black text-xs uppercase mb-0.5 tracking-wider">Tijd voor een poepje!</h4>
+                                    <p className="text-[11px] font-bold opacity-90 leading-tight">Het is {poopGoal.intervalDays} dagen of langer geleden.</p>
+                                </div>
+                            </section>
+                        )}
                         {isBathOverdue && (
                             <section className="bg-sky-500 text-white p-4 rounded-[1.8rem] shadow-lg flex items-center gap-4 border border-sky-400 animate-in fade-in duration-500">
                                 <AlertCircle size={28} className="shrink-0" />
@@ -946,6 +983,8 @@ function AppInternal() {
                         toggleRequirement={toggleRequirement}
                         bathGoal={bathGoal}
                         onBathGoalChange={handleBathGoalChange}
+                        poopGoal={poopGoal}
+                        onPoopGoalChange={handlePoopGoalChange}
                         handleExport={handleExport}
                         fileInputRef={fileInputRef}
                         handleImport={handleImport}
