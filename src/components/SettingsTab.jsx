@@ -33,7 +33,11 @@ export function SettingsTab({
     isSubmitting,
     account,
     handleSignOut,
-    APP_VERSION
+    APP_VERSION,
+    exportStartDate,
+    setExportStartDate,
+    exportEndDate,
+    setExportEndDate
 }) {
     return (
         <div className="space-y-6 animate-in slide-in-from-right-3 duration-300 pb-12">
@@ -204,8 +208,12 @@ export function SettingsTab({
                     <Database size={20} className="text-emerald-500" />
                     <h3 className="font-black uppercase text-sm tracking-tight">Gegevens</h3>
                 </div>
-                <div className="grid gap-2">
-                    <button onClick={handleExport} className={`p-4 rounded-xl border flex items-center justify-between active:scale-95 transition-all ${isDarkMode ? 'border-slate-800 text-indigo-400' : 'border-slate-50 text-indigo-600'}`}>
+                <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                        <input type="date" value={exportStartDate} onChange={(e) => setExportStartDate(e.target.value)} className={`p-2 rounded-lg text-xs border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`} />
+                        <input type="date" value={exportEndDate} onChange={(e) => setExportEndDate(e.target.value)} className={`p-2 rounded-lg text-xs border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`} />
+                    </div>
+                    <button onClick={handleExport} className={`w-full p-4 rounded-xl border flex items-center justify-between active:scale-95 transition-all ${isDarkMode ? 'border-slate-800 text-indigo-400' : 'border-slate-50 text-indigo-600'}`}>
                         <div className="flex items-center gap-3"><Download size={18} /><span className="text-xs font-black uppercase tracking-widest">Backup maken</span></div>
                         <ArrowRight size={14} />
                     </button>

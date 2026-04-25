@@ -119,6 +119,8 @@ function AppInternal() {
     const [poopGoal, setPoopGoal] = useState({ enabled: false, intervalDays: 2 });
     const [alertThresholds, setAlertThresholds] = useState({ feeding: 20, plas: 20, poep: 20 });
     const [visibilitySettings, setVisibilitySettings] = useState({ Fles: true, Borst: true, Vast: true });
+    const [exportStartDate, setExportStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
+    const [exportEndDate, setExportEndDate] = useState(new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]);
 
     // Form states
     const [editingId, setEditingId] = useState(null);
@@ -376,11 +378,17 @@ function AppInternal() {
     };
 
     const handleExport = () => {
-        const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+        const start = new Date(`${exportStartDate}T00:00:00`);
+        const end = new Date(`${exportEndDate}T23:59:59`);
+        const filteredLogs = logs.filter(log => {
+            const logDate = toSafeDate(log.timestamp);
+            return logDate >= start && logDate <= end;
+        });
+        const blob = new Blob([JSON.stringify(filteredLogs, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `baby-tracker-backup-${account.id}.json`;
+        link.download = `baby-tracker-backup-${account.id}-${exportStartDate}-to-${exportEndDate}.json`;
         link.click();
     };
 
@@ -1114,6 +1122,10 @@ function AppInternal() {
                         account={account}
                         handleSignOut={handleSignOut}
                         APP_VERSION={APP_VERSION}
+                        exportStartDate={exportStartDate}
+                        setExportStartDate={setExportStartDate}
+                        exportEndDate={exportEndDate}
+                        setExportEndDate={setExportEndDate}
                     />
                 )}
             </main>
