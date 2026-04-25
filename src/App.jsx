@@ -747,7 +747,7 @@ function AppInternal() {
 
     const lastLogTimes = useMemo(() => {
         const findLast = (predicate) => {
-            const log = logs.find(predicate);
+            const log = logs.find(l => predicate(l) && !l.isPlanned);
             if (!log) return { text: '-', mins: 0 };
             const mins = getDiffMinutes(log.timestamp, now);
             return { text: formatDuration(mins), mins };
