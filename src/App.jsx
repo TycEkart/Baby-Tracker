@@ -729,13 +729,13 @@ function AppInternal() {
                 lastSeen.bath = ts;
             }
             if (log.isSleep) {
-                if (lastSeen.sleep) {
+                if (lastSeen.sleep && lastSeen.sleep.sleepEndTime) {
                     logIntervals.push({
-                        text: formatDuration(getDiffMinutes(lastSeen.sleep, ts)),
+                        text: formatDuration(getDiffMinutes(lastSeen.sleep.sleepEndTime, ts)),
                         category: 'sleep'
                     });
                 }
-                lastSeen.sleep = ts;
+                lastSeen.sleep = log;
             }
 
             if (logIntervals.length > 0) {
@@ -749,7 +749,7 @@ function AppInternal() {
         const findLast = (predicate) => {
             const log = logs.find(l => predicate(l) && !l.isPlanned);
             if (!log) return { text: '-', mins: 0 };
-            const mins = getDiffMinutes(log.timestamp, now);
+            const mins = getDiffMinutes(log.isSleep && log.sleepEndTime ? log.sleepEndTime : log.timestamp, now);
             return { text: formatDuration(mins), mins };
         };
 
