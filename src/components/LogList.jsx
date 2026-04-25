@@ -63,8 +63,11 @@ export function LogList({
 
                         const isT = highlightedId === log.id;
                         const isEditing = editingId === log.id;
+                        const isPastPlanned = log.isPlanned && toSafeDate(log.timestamp) < now;
+
                         const getBg = () => {
                             if (isEditing) return isDarkMode ? 'bg-indigo-900/30 border-indigo-500 ring-2 ring-indigo-500 shadow-lg shadow-indigo-500/20' : 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-400 shadow-md shadow-indigo-500/10';
+                            if (isPastPlanned) return isDarkMode ? 'bg-red-900/50 border-red-500/50' : 'bg-red-50 border-red-200';
                             if (!isT) return isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100';
                             return actionType === 'save' ? (isDarkMode ? 'bg-emerald-900/50 ring-emerald-500 ring-2' : 'bg-emerald-50 ring-emerald-400 ring-2') : (isDarkMode ? 'bg-rose-900/50 ring-rose-500 ring-2' : 'bg-rose-50 ring-rose-400 ring-2');
                         };
@@ -92,7 +95,7 @@ export function LogList({
                         }, {});
 
                         return (
-                            <div key={log.id} id={`log-item-${log.id}`} onClick={() => startEdit(log)} className={`p-4 rounded-[1.8rem] border flex items-start gap-4 transition-all duration-700 cursor-pointer border-slate-100 dark:border-slate-800 ${getBg()} ${log.isPlanned ? 'opacity-50' : ''}`}>
+                            <div key={log.id} id={`log-item-${log.id}`} onClick={() => startEdit(log)} className={`p-4 rounded-[1.8rem] border flex items-start gap-4 transition-all duration-700 cursor-pointer border-slate-100 dark:border-slate-800 ${getBg()} ${log.isPlanned && !isPastPlanned ? 'opacity-50' : ''}`}>
                                 <div className={`flex flex-wrap items-center justify-center gap-1 p-3 rounded-2xl w-16 h-16 shrink-0 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
                                     {icons.map((icon, idx) => <div key={idx} className="animate-in zoom-in duration-300">{icon}</div>)}
                                 </div>
