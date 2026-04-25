@@ -3,9 +3,9 @@
  * It's a complex component with its own state for managing form inputs.
  * It receives many props from the main App component to handle state changes and submissions.
  */
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
-    Clock, Milk, Baby, Utensils, Heart, Plus, Minus, Droplets, Sparkles, Calendar, RefreshCw, Bath
+    Clock, Milk, Baby, Utensils, Heart, Plus, Minus, Droplets, Sparkles, Calendar, RefreshCw, Bath, Bed, X
 } from 'lucide-react';
 import { formatDateTimeFull, getDiffMinutes, toLocalDateString, toSafeDate, getLocalDateTimeString } from '../utils/helpers';
 import { PoopIcon } from './PoopIcon';
@@ -27,6 +27,7 @@ export function LogForm({
     timestamp,
     setTimestamp,
     adjustTime,
+    adjustSleepEndTime,
     firstBreast,
     setFirstBreast,
     amountLeft,
@@ -42,10 +43,37 @@ export function LogForm({
     vitamins,
     setVitamins,
     hasBath,
-    setHasBath
+    setHasBath,
+    isSleep,
+    setIsSleep,
+    sleepEndTime,
+    setSleepEndTime
 }) {
     const dateTimeInputRef = useRef(null);
+    const sleepEndDateTimeInputRef = useRef(null);
     const [showOther, setShowOther] = useState(false);
+    const [activePreset, setActivePreset] = useState(null);
+
+    useEffect(() => {
+        if (!sleepEndTime) {
+            setActivePreset(null);
+        }
+    }, [sleepEndTime]);
+
+    const handlePresetClick = (mins) => {
+        if (mins === 'now') {
+            setSleepEndTime(getLocalDateTimeString());
+            setActivePreset('now');
+        } else {
+            adjustSleepEndTime(mins);
+            setActivePreset(mins);
+        }
+    };
+
+    const handleManualTimeChange = (e) => {
+        setSleepEndTime(e.target.value);
+        setActivePreset(null);
+    };
 
     const getButtonStyles = () => {
         if (editingId) {
@@ -60,6 +88,7 @@ export function LogForm({
         if (hasPoep) colors.push('#78350f');
         if (vitamins.d || vitamins.k) colors.push('#9333ea');
         if (hasBath) colors.push('#0ea5e9');
+        if (isSleep) colors.push('#16a34a', '#15803d');
 
         if (colors.length === 0) {
             return { background: 'linear-gradient(to bottom right, #6366f1, #8b5cf6)', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.2), 0 4px 6px -2px rgba(139, 92, 246, 0.1)' };
@@ -70,9 +99,10 @@ export function LogForm({
         return { background: `linear-gradient(to bottom right, ${colors.join(', ')})` };
     };
 
-    const getTimestampWarningClass = () => {
+    const getTimestampWarningClass = (time) => {
+        if (isSleep) return 'text-green-500';
         const now = new Date();
-        const selectedDate = toSafeDate(timestamp);
+        const selectedDate = toSafeDate(time);
 
         const diffMins = Math.abs(getDiffMinutes(now, selectedDate));
         const isDifferentDay = toLocalDateString(now) !== toLocalDateString(selectedDate);
@@ -88,18 +118,26 @@ export function LogForm({
 
     const getTimeColor = (type) => {
         const avgMap = {
-            'feeding': weeklyAvgs.avgFeedingInterval,
-            'Fles': weeklyAvgs.avgFeedingInterval,
-            'Borst': weeklyAvgs.avgFeedingInterval,
-            'Vast': weeklyAvgs.avgFeedingInterval,
-            'plas': weeklyAvgs.avgPlasInterval,
-            'poep': weeklyAvgs.avgPoepInterval,
+            'feeding': weeklyAvgs.avgFeedingIntervals,
+            'Fles': weeklyAvgs.avgFeedingIntervals,
+            'Borst': weeklyAvgs.avgFeedingIntervals,
+            'Vast': weeklyAvgs.avgFeedingIntervals,
+            'plas': { night: weeklyAvgs.avgPlasInterval, morning: weeklyAvgs.avgPlasInterval, afternoon: weeklyAvgs.avgPlasInterval, evening: weeklyAvgs.avgPlasInterval },
+            'poep': { night: weeklyAvgs.avgPoepInterval, morning: weeklyAvgs.avgPoepInterval, afternoon: weeklyAvgs.avgPoepInterval, evening: weeklyAvgs.avgPoepInterval },
         };
 
         if (!lastLogTimes[type] || !lastLogTimes[type].mins || !avgMap[type]) return '';
 
         const diff = lastLogTimes[type].mins;
-        const avg = avgMap[type];
+        const hour = new Date().getHours();
+        let avg;
+        if (hour >= 0 && hour < 6) avg = avgMap[type].night;
+        else if (hour >= 6 && hour < 12) avg = avgMap[type].morning;
+        else if (hour >= 12 && hour < 18) avg = avgMap[type].afternoon;
+        else avg = avgMap[type].evening;
+
+        if (!avg) return '';
+
         const threshold = alertThresholds[type] || alertThresholds.feeding;
 
         if (diff > avg) return 'text-red-500';
@@ -108,6 +146,7 @@ export function LogForm({
     };
 
     const [datePart, timePart] = formatDateTimeFull(timestamp).split(', ');
+    const [endDatePart, endTimePart] = sleepEndTime ? formatDateTimeFull(sleepEndTime).split(', ') : ['', ''];
 
     return (
         <section className={`p-5 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} ${editingId ? 'ring-2 ring-indigo-500 shadow-xl' : ''}`}>
@@ -146,7 +185,7 @@ export function LogForm({
 
                     <div className={`relative group overflow-hidden rounded-2xl border shadow-inner ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
                         <button type="button" onClick={() => dateTimeInputRef.current.showPicker()} className="w-full text-center p-4">
-                            <div className={`flex flex-col items-center justify-center pointer-events-none ${getTimestampWarningClass()}`}>
+                            <div className={`flex flex-col items-center justify-center pointer-events-none ${getTimestampWarningClass(timestamp)}`}>
                                 <span className="text-xs font-semibold uppercase opacity-70">{datePart}</span>
                                 <span className="text-3xl font-black">{timePart}</span>
                             </div>
@@ -231,7 +270,7 @@ export function LogForm({
                 )}
 
                 <div className="space-y-3">
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                         <button type="button" onClick={() => setHasPlas(!hasPlas)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1.5 transition-all ${hasPlas ? 'bg-yellow-400 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
                             <Droplets size={14} /> Plas
                             <span className={`text-[9px] opacity-70 normal-case font-medium ${getTimeColor('plas')}`}>{lastLogTimes.plas.text}</span>
@@ -239,6 +278,10 @@ export function LogForm({
                         <button type="button" onClick={() => setHasPoep(!hasPoep)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1.5 transition-all ${hasPoep ? 'bg-amber-900 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
                             <PoopIcon className="w-3.5 h-3.5" /> Poep
                             <span className={`text-[9px] opacity-70 normal-case font-medium ${getTimeColor('poep')}`}>{lastLogTimes.poep.text}</span>
+                        </button>
+                        <button type="button" onClick={() => setIsSleep(!isSleep)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1.5 transition-all ${isSleep ? 'bg-green-600 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
+                            <Bed size={14} /> Slaap
+                            <span className="text-[9px] opacity-70 normal-case font-medium">{lastLogTimes.sleep.text}</span>
                         </button>
                         <button type="button" onClick={() => setShowOther(!showOther)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1.5 transition-all ${(vitamins.d || vitamins.k || hasBath) ? 'bg-purple-600 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
                             <Sparkles size={14} /> Overige
@@ -258,6 +301,43 @@ export function LogForm({
                                 Bad
                                 <span className="text-[9px] opacity-70 normal-case font-medium">{lastLogTimes.bath.text}</span>
                             </button>
+                        </div>
+                    )}
+                    {isSleep && (
+                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                            <label className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Eindtijd (leeg laten om later in te vullen)</label>
+                            <div className="grid grid-cols-5 gap-1.5 px-0.5">
+                                {[{ label: '15m', val: 15 }, { label: '30m', val: 30 }, { label: '45m', val: 45 }, { label: '60m', val: 60 }
+                                ].map((btn) => (
+                                    <button
+                                        key={btn.val}
+                                        type="button"
+                                        onClick={() => handlePresetClick(btn.val)}
+                                        className={`py-1.5 rounded-lg text-[10px] font-black uppercase border transition-all active:scale-90 ${activePreset === btn.val ? 'bg-green-600 text-white' : (isDarkMode ? 'bg-slate-800 border-slate-700 text-green-400' : 'bg-slate-100 border-slate-200 text-green-600')}`}
+                                    >
+                                        {btn.label}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => handlePresetClick('now')}
+                                    className={`py-1.5 rounded-lg text-[10px] font-black uppercase border transition-all active:scale-90 ${activePreset === 'now' ? 'bg-green-600 text-white' : (isDarkMode ? 'bg-slate-800 border-slate-700 text-green-400' : 'bg-slate-100 border-slate-200 text-green-600')}`}
+                                >
+                                    Nu
+                                </button>
+                            </div>
+                            <div className={`relative group overflow-hidden rounded-2xl border shadow-inner ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                                <button type="button" onClick={() => sleepEndDateTimeInputRef.current.showPicker()} className="w-full text-center p-4">
+                                    <div className={`flex flex-col items-center justify-center pointer-events-none ${getTimestampWarningClass(sleepEndTime)}`}>
+                                        <span className="text-xs font-semibold uppercase opacity-70">{endDatePart || 'Nog niet ingesteld'}</span>
+                                        <span className="text-3xl font-black">{endTimePart || '-:--'}</span>
+                                    </div>
+                                </button>
+                                <button type="button" onClick={() => { setSleepEndTime(''); setActivePreset(null); }} className={`absolute top-3 right-3 p-2 rounded-full active:scale-90 transition-transform ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-200'}`}>
+                                    <X size={14} className="text-red-500 opacity-50" />
+                                </button>
+                                <input ref={sleepEndDateTimeInputRef} type="datetime-local" value={sleepEndTime} onChange={handleManualTimeChange} className="hidden" />
+                            </div>
                         </div>
                     )}
                 </div>

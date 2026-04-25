@@ -30,7 +30,7 @@ import {
     Tag, Zap, Filter, Utensils, Settings, ShieldCheck, Heart, RefreshCw,
     ArrowLeft, ArrowRight, Moon, Sun, ChevronLeft, ChevronRight, FlaskConical,
     CheckCircle2, FileCode2, ChevronDown, ChevronUp, Eraser, Sparkles, AlertCircle,
-    Eye, EyeOff, Bug, LogOut, Copy, Users, Bath
+    Eye, EyeOff, Bug, LogOut, Copy, Users, Bath, Bed
 } from 'lucide-react';
 
 import { isEveningTime, toSafeDate, toLocalDateString, formatDuration, getDiffMinutes, getLocalDateTimeString, formatDurationInDays } from './utils/helpers';
@@ -131,6 +131,8 @@ function AppInternal() {
     const [hasPoep, setHasPoep] = useState(false);
     const [vitamins, setVitamins] = useState({ d: false, k: false });
     const [hasBath, setHasBath] = useState(false);
+    const [isSleep, setIsSleep] = useState(false);
+    const [sleepEndTime, setSleepEndTime] = useState('');
     const [timestamp, setTimestamp] = useState(getLocalDateTimeString());
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -224,9 +226,10 @@ function AppInternal() {
                 firstBreast: feedType === 'Borst' ? firstBreast : null,
                 hasPlas,
                 hasPoep,
-                hasVitamins: vitamins.d || vitamins.k,
                 vitamins,
                 hasBath,
+                isSleep,
+                sleepEndTime: isSleep && sleepEndTime ? new Date(sleepEndTime).toISOString() : null,
                 updatedAt: Timestamp.now()
             };
 
@@ -261,6 +264,8 @@ function AppInternal() {
         setHasPoep(false);
         setVitamins({ d: false, k: false });
         setHasBath(false);
+        setIsSleep(false);
+        setSleepEndTime('');
 
         if (!keep) {
             setFeedType(null);
@@ -282,6 +287,8 @@ function AppInternal() {
         setHasPoep(!!log.hasPoep);
         setVitamins(log.vitamins || { d: false, k: false });
         setHasBath(!!log.hasBath);
+        setIsSleep(!!log.isSleep);
+        setSleepEndTime(log.sleepEndTime ? getLocalDateTimeString(toSafeDate(log.sleepEndTime)) : '');
         setTimestamp(getLocalDateTimeString(toSafeDate(log.timestamp)));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -301,6 +308,12 @@ function AppInternal() {
         const current = new Date(timestamp);
         current.setMinutes(current.getMinutes() + mins);
         setTimestamp(getLocalDateTimeString(current));
+    };
+
+    const adjustSleepEndTime = (mins) => {
+        const startTime = new Date(timestamp);
+        startTime.setMinutes(startTime.getMinutes() + mins);
+        setSleepEndTime(getLocalDateTimeString(startTime));
     };
 
     const toggleDarkMode = async () => {
@@ -655,7 +668,8 @@ function AppInternal() {
             'poep': null,
             'plas': null,
             'vitamins': null,
-            'bath': null
+            'bath': null,
+            'sleep': null,
         };
 
         sorted.forEach(log => {
@@ -708,6 +722,15 @@ function AppInternal() {
                 }
                 lastSeen.bath = ts;
             }
+            if (log.isSleep) {
+                if (lastSeen.sleep) {
+                    logIntervals.push({
+                        text: formatDuration(getDiffMinutes(lastSeen.sleep, ts)),
+                        category: 'sleep'
+                    });
+                }
+                lastSeen.sleep = ts;
+            }
 
             if (logIntervals.length > 0) {
                 result[log.id] = logIntervals;
@@ -734,6 +757,7 @@ function AppInternal() {
             'vitaminsK': findLast(l => l.vitamins?.k),
             'bath': findLast(l => l.hasBath),
             'feeding': findLast(l => l.feedType),
+            'sleep': findLast(l => l.isSleep),
         };
     }, [logs, now]);
 
@@ -741,8 +765,8 @@ function AppInternal() {
         const hasFeeding = (feedType === 'Borst')
             ? (parseInt(amountLeft || 0) > 0 || parseInt(amountRight || 0) > 0)
             : (feedType && parseInt(amount || 0) > 0);
-        return hasFeeding || hasPlas || hasPoep || vitamins.d || vitamins.k || hasBath;
-    }, [amount, amountLeft, amountRight, feedType, hasPlas, hasPoep, vitamins, hasBath]);
+        return hasFeeding || hasPlas || hasPoep || vitamins.d || vitamins.k || hasBath || isSleep;
+    }, [amount, amountLeft, amountRight, feedType, hasPlas, hasPoep, vitamins, hasBath, isSleep]);
 
     const missingVitamins = useMemo(() => {
         const todayDs = toLocalDateString(new Date());
@@ -995,6 +1019,7 @@ function AppInternal() {
                             timestamp={timestamp}
                             setTimestamp={setTimestamp}
                             adjustTime={adjustTime}
+                            adjustSleepEndTime={adjustSleepEndTime}
                             firstBreast={firstBreast}
                             setFirstBreast={setFirstBreast}
                             amountLeft={amountLeft}
@@ -1011,6 +1036,10 @@ function AppInternal() {
                             setVitamins={setVitamins}
                             hasBath={hasBath}
                             setHasBath={setHasBath}
+                            isSleep={isSleep}
+                            setIsSleep={setIsSleep}
+                            sleepEndTime={sleepEndTime}
+                            setSleepEndTime={setSleepEndTime}
                         />
 
                         <LogList

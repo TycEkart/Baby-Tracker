@@ -3,8 +3,8 @@
  * It groups them by day and provides functionality to edit or delete entries.
  */
 import React from 'react';
-import { Heart, Milk, Utensils, Droplets, Sparkles, Baby, Clock, Trash2, Bath } from 'lucide-react';
-import { getRelativeDateLabel, formatTime, getIntervalStyle } from '../utils/helpers';
+import { Heart, Milk, Utensils, Droplets, Sparkles, Baby, Clock, Trash2, Bath, Bed } from 'lucide-react';
+import { getRelativeDateLabel, formatTime, getIntervalStyle, formatDuration, getDiffMinutes, toSafeDate } from '../utils/helpers';
 
 // Helper to get the icon for a given category
 const getCategoryIcon = (category) => {
@@ -16,6 +16,7 @@ const getCategoryIcon = (category) => {
         case 'plas': return <Droplets size={10} />;
         case 'vitamins': return <Sparkles size={10} />;
         case 'bath': return <Bath size={10} />;
+        case 'sleep': return <Bed size={10} />;
         default: return <Clock size={10} />;
     }
 };
@@ -56,6 +57,7 @@ export function LogList({
                         };
 
                         const icons = [];
+                        if (log.isSleep) icons.push(<Bed size={20} className="text-green-500" />);
                         if (log.feedType === 'Borst') icons.push(<Heart size={20} className="text-pink-500" />);
                         else if (log.feedType === 'Fles') icons.push(<Milk size={20} className="text-indigo-500" />);
                         else if (log.feedType === 'Vast') icons.push(<Utensils size={20} className="text-orange-500" />);
@@ -85,7 +87,9 @@ export function LogList({
                                     <div className="flex-1 min-w-0">
                                         <span className="font-black opacity-60">{formatTime(log.timestamp)}</span>
                                         <h3 className="font-black">
-                                            {log.feedType === 'Borst' ? `L: ${log.amountLeft}m | R: ${log.amountRight}m` : log.feedType ? `${log.amount}${log.feedType === 'Vast' ? 'g' : 'ml'} ${log.feedType}` : 'Gebeurtenis'}
+                                            {log.isSleep ? (
+                                                log.sleepEndTime ? `Slaap: ${formatDuration(getDiffMinutes(log.timestamp, log.sleepEndTime))}` : 'Slaapt...'
+                                            ) : log.feedType === 'Borst' ? `L: ${log.amountLeft}m | R: ${log.amountRight}m` : log.feedType ? `${log.amount}${log.feedType === 'Vast' ? 'g' : 'ml'} ${log.feedType}` : 'Gebeurtenis'}
                                         </h3>
                                         <div className="flex flex-wrap gap-2 mt-1">
                                             {log.feedType === 'Borst' && log.firstBreast && <div className="font-black uppercase text-pink-600 bg-pink-500/10 px-1.5 py-0.5 rounded-md">Start: {log.firstBreast}</div>}
