@@ -47,7 +47,9 @@ export function LogForm({
     isSleep,
     setIsSleep,
     sleepEndTime,
-    setSleepEndTime
+    setSleepEndTime,
+    isPlanned,
+    setIsPlanned
 }) {
     const dateTimeInputRef = useRef(null);
     const sleepEndDateTimeInputRef = useRef(null);
@@ -283,7 +285,7 @@ export function LogForm({
                             <Bed size={14} /> Slaap
                             <span className="text-[9px] opacity-70 normal-case font-medium">{lastLogTimes.sleep.text}</span>
                         </button>
-                        <button type="button" onClick={() => setShowOther(!showOther)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1.5 transition-all ${(vitamins.d || vitamins.k || hasBath) ? 'bg-purple-600 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
+                        <button type="button" onClick={() => setShowOther(!showOther)} className={`py-3.5 rounded-xl border font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1.5 transition-all ${(vitamins.d || vitamins.k || hasBath || isPlanned) ? 'bg-purple-600 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-800 border-transparent text-slate-100' : 'bg-slate-100 border-transparent text-slate-500')}`}>
                             <Sparkles size={14} /> Overige
                         </button>
                     </div>
@@ -300,6 +302,9 @@ export function LogForm({
                             <button type="button" onClick={() => setHasBath(!hasBath)} className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase border flex flex-col items-center justify-center gap-1 ${hasBath ? 'bg-sky-500 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-400')}`}>
                                 Bad
                                 <span className="text-[9px] opacity-70 normal-case font-medium">{lastLogTimes.bath.text}</span>
+                            </button>
+                            <button type="button" onClick={() => setIsPlanned(!isPlanned)} className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase border flex flex-col items-center justify-center gap-1.5 transition-all ${isPlanned ? 'bg-gray-500 text-white border-transparent shadow-sm' : (isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-400')}`}>
+                                <Calendar size={14} /> Gepland
                             </button>
                         </div>
                     )}

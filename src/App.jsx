@@ -133,6 +133,7 @@ function AppInternal() {
     const [hasBath, setHasBath] = useState(false);
     const [isSleep, setIsSleep] = useState(false);
     const [sleepEndTime, setSleepEndTime] = useState('');
+    const [isPlanned, setIsPlanned] = useState(false);
     const [timestamp, setTimestamp] = useState(getLocalDateTimeString());
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -217,6 +218,7 @@ function AppInternal() {
         if (!user || !db || isSubmitting || !account) return;
         setIsSubmitting(true);
         try {
+            const isFuture = getDiffMinutes(new Date(), timestamp) > 15;
             const payload = {
                 timestamp: new Date(timestamp).toISOString(),
                 feedType,
@@ -230,6 +232,7 @@ function AppInternal() {
                 hasBath,
                 isSleep,
                 sleepEndTime: isSleep && sleepEndTime ? new Date(sleepEndTime).toISOString() : null,
+                isPlanned: !!(editingId ? isPlanned : isFuture),
                 updatedAt: Timestamp.now()
             };
 
@@ -266,6 +269,7 @@ function AppInternal() {
         setHasBath(false);
         setIsSleep(false);
         setSleepEndTime('');
+        setIsPlanned(false);
 
         if (!keep) {
             setFeedType(null);
@@ -277,6 +281,7 @@ function AppInternal() {
     };
 
     const startEdit = (log) => {
+        const isFuture = getDiffMinutes(new Date(), log.timestamp) > 15;
         setEditingId(log.id);
         setFeedType(log.feedType || null);
         setAmount(log.amount || 0);
@@ -289,6 +294,7 @@ function AppInternal() {
         setHasBath(!!log.hasBath);
         setIsSleep(!!log.isSleep);
         setSleepEndTime(log.sleepEndTime ? getLocalDateTimeString(toSafeDate(log.sleepEndTime)) : '');
+        setIsPlanned(!!(log.isPlanned && isFuture));
         setTimestamp(getLocalDateTimeString(toSafeDate(log.timestamp)));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -1052,6 +1058,8 @@ function AppInternal() {
                             setIsSleep={setIsSleep}
                             sleepEndTime={sleepEndTime}
                             setSleepEndTime={setSleepEndTime}
+                            isPlanned={isPlanned}
+                            setIsPlanned={setIsPlanned}
                         />
 
                         <LogList
