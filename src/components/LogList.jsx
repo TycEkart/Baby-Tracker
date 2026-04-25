@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { Heart, Milk, Utensils, Droplets, Sparkles, Baby, Clock, Trash2, Bath, Bed } from 'lucide-react';
+import { PoopIcon } from './PoopIcon';
 import { getRelativeDateLabel, formatTime, getIntervalStyle, formatDuration, getDiffMinutes, toSafeDate } from '../utils/helpers';
 
 // Helper to get the icon for a given category
@@ -12,7 +13,7 @@ const getCategoryIcon = (category) => {
         case 'Borst': return <Heart size={10} />;
         case 'Fles': return <Milk size={10} />;
         case 'Vast': return <Utensils size={10} />;
-        case 'poep': return <Droplets size={10} />;
+        case 'poep': return <PoopIcon className="w-2.5 h-2.5" />;
         case 'plas': return <Droplets size={10} />;
         case 'vitamins': return <Sparkles size={10} />;
         case 'bath': return <Bath size={10} />;
@@ -78,7 +79,9 @@ export function LogList({
                         else if (log.feedType === 'Fles') icons.push(<Milk size={20} className="text-indigo-500" />);
                         else if (log.feedType === 'Vast') icons.push(<Utensils size={20} className="text-orange-500" />);
 
-                        if (log.hasPlas || log.hasPoep) icons.push(<Droplets size={18} className={log.hasPoep ? 'text-amber-700' : 'text-yellow-400'} />);
+                        if (log.hasPlas) icons.push(<Droplets size={18} className="text-yellow-400" />);
+                        if (log.hasPoep) icons.push(<PoopIcon className="w-[18px] h-[18px] text-amber-700" />);
+
                         if (log.vitamins?.d || log.vitamins?.k) icons.push(<Sparkles size={18} className="text-purple-500" />);
                         if (log.hasBath) icons.push(<Bath size={18} className="text-sky-500" />);
                         if (icons.length === 0) icons.push(<Baby size={20} className="text-slate-400" />);
