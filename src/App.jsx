@@ -889,11 +889,23 @@ function AppInternal() {
                 groups[dk].totalVast += Number(l.amount) || 0;
             }
         });
-        return Object.keys(groups).sort().reverse().map(date => ({
+        const result = Object.keys(groups).sort().reverse().map(date => ({
             date,
             ...groups[date]
         }));
-    }, [logs]);
+
+        const today = toLocalDateString(new Date());
+        const todayGroup = result.find(g => g.date === today);
+
+        if (todayGroup) {
+            const nowIndex = todayGroup.items.findIndex(log => toSafeDate(log.timestamp) < now);
+            if (nowIndex !== 0) {
+                 todayGroup.items.splice(nowIndex, 0, { id: 'now-marker', type: 'now' });
+            }
+        }
+
+        return result;
+    }, [logs, now]);
 
     // Effects
     useEffect(() => {
@@ -1051,6 +1063,7 @@ function AppInternal() {
                             setItemToDelete={setItemToDelete}
                             isDarkMode={isDarkMode}
                             typeIntervals={typeIntervals}
+                            now={now}
                         />
                     </>
                 ) : activeTab === 'trends' ? (

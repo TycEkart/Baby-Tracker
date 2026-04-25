@@ -29,7 +29,8 @@ export function LogList({
     startEdit,
     setItemToDelete,
     isDarkMode,
-    typeIntervals
+    typeIntervals,
+    now
 }) {
     return (
         <div className="space-y-6 mt-8 pb-10">
@@ -48,6 +49,18 @@ export function LogList({
                         <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800"></div>
                     </div>
                     {group.items.map(log => {
+                        if (log.type === 'now') {
+                            return (
+                                <div key="now-marker" className="flex items-center justify-between gap-3 py-2">
+                                    <div className="h-[1px] flex-1 bg-blue-500/50"></div>
+                                    <div className="text-center">
+                                        <span className="font-bold uppercase text-blue-500">Nu - {formatTime(now)}</span>
+                                    </div>
+                                    <div className="h-[1px] flex-1 bg-blue-500/50"></div>
+                                </div>
+                            );
+                        }
+
                         const isT = highlightedId === log.id;
                         const isEditing = editingId === log.id;
                         const getBg = () => {
