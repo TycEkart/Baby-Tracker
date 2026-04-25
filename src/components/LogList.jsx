@@ -97,9 +97,13 @@ export function LogList({
                             return acc;
                         }, {});
 
+                        // Use a taller block if there are 4 icons or more
+                        // w-16 = 4rem (64px) -> fits 2 per row
+                        // h-16 = 4rem (64px) -> fits 2 rows
+                        // h-auto or min-h-[4rem] allows it to stretch vertically
                         return (
                             <div key={log.id} id={`log-item-${log.id}`} onClick={() => startEdit(log)} className={`p-4 rounded-[1.8rem] border flex items-start gap-4 transition-all duration-700 cursor-pointer border-slate-100 dark:border-slate-800 ${getBg()} ${log.isPlanned && !isPastPlanned ? 'opacity-50' : ''}`}>
-                                <div className={`flex flex-wrap items-center justify-center gap-1 p-3 rounded-2xl w-16 h-16 shrink-0 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                                <div className={`flex flex-wrap items-center justify-center gap-1 p-3 rounded-2xl w-16 min-h-[4rem] shrink-0 transition-all duration-300 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
                                     {icons.map((icon, idx) => <div key={idx} className="animate-in zoom-in duration-300">{icon}</div>)}
                                 </div>
                                 <div className="flex-1 min-w-0 flex justify-between items-start gap-2">
